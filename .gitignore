@@ -57,3 +57,4 @@ data/raw/*.parquet
 data/raw/*.csv
 data/cache/
 graphify-out/
+data/uk_gov_spending_2024.csv
