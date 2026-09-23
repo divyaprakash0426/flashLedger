@@ -1,0 +1,75 @@
+{
+  "categories": [
+    {
+      "id": 0,
+      "name": "Food & Dining",
+      "description": "Restaurants, groceries, fast food, coffee shops, food delivery",
+      "keywords": ["restaurant", "food", "grocery", "coffee", "dining", "meal", "cafe", "pizza", "burger", "starbucks", "mcdonald", "kfc", "subway", "domino", "delivery", "takeout", "supermarket", "tesco", "coles", "big bazaar", "swiggy", "zomato", "uber eats", "doordash", "grocery shopping", "restaurant dinner", "coffee shop", "lunch", "dinner", "breakfast", "snack", "grocery", "groceries"]
+    },
+    {
+      "id": 1,
+      "name": "Transportation",
+      "description": "Gas, rideshare, airlines, public transport, car rental",
+      "keywords": ["uber", "lyft", "taxi", "ride", "petrol", "gas", "fuel", "station", "metro", "bus", "train", "parking", "toll", "rental", "auto", "ola", "airline", "flight", "railway", "transport", "rideshare", "delta", "american", "united", "southwest", "jetblue", "gasoline", "gasoline refill", "gas refill", "fuel refill", "car repair", "car wash", "automotive"]
+    },
+    {
+      "id": 2,
+      "name": "Shopping & Retail",
+      "description": "Online shopping, electronics, retail, fashion, home & garden",
+      "keywords": ["purchase", "buy", "shop", "retail", "amazon", "ebay", "target", "walmart", "costco", "best buy", "apple store", "nike", "adidas", "zara", "h&m", "uniqlo", "ikea", "home depot", "lowes", "sephora", "ulta", "gamestop", "microsoft", "google play", "online", "store", "online shopping", "clothing shopping", "shopping", "point of sale"]
+    },
+    {
+      "id": 3,
+      "name": "Entertainment & Recreation",
+      "description": "Streaming, gaming, movies, music, sports",
+      "keywords": ["netflix", "spotify", "amazon prime", "disney", "hulu", "youtube", "apple music", "cinema", "movie", "theater", "concert", "museum", "zoo", "amusement", "bowling", "golf", "gym", "fitness", "sports", "gaming", "streaming", "entertainment", "movie tickets", "movie theater", "gym membership", "subscriptions", "online gaming"]
+    },
+    {
+      "id": 4,
+      "name": "Healthcare & Medical",
+      "description": "Medical, pharmacy, dental, vision, fitness",
+      "keywords": ["hospital", "doctor", "medical", "pharmacy", "dental", "eye", "clinic", "surgery", "ambulance", "physiotherapy", "lab", "x-ray", "mri", "blood test", "vaccination", "emergency", "specialist", "health", "medicine", "prescription", "doctor's visit", "pharmacy purchase", "healthcare"]
+    },
+    {
+      "id": 5,
+      "name": "Utilities & Services",
+      "description": "Electricity, water, gas, internet & phone, cable",
+      "keywords": ["electricity", "water", "gas", "internet", "phone", "cable", "mobile", "broadband", "wifi", "landline", "utility", "power", "service", "telecom", "isp", "bill", "phone bill", "internet bill", "utility bill", "mobile phone bill", "rent payment", "rent"]
+    },
+    {
+      "id": 6,
+      "name": "Financial Services",
+      "description": "Banking, insurance, credit cards, investments, taxes",
+      "keywords": ["bank", "atm", "transfer", "loan", "mortgage", "insurance", "investment", "stock", "mutual fund", "retirement", "banking", "financial", "advisor", "account", "wire", "currency", "planning", "wealth", "brokerage", "consultation", "atm withdrawal", "cash withdrawal", "credit card payment", "loan payment", "mortgage payment"]
+    },
+    {
+      "id": 7,
+      "name": "Income",
+      "description": "Salary, freelance, business, investments, government benefits",
+      "keywords": ["salary", "wage", "payroll", "income", "deposit", "credit", "refund", "reimbursement", "cashback", "reward", "bonus", "commission", "freelance", "contract", "business", "investment", "dividend", "interest", "rental", "pension", "benefit", "allowance", "stipend", "scholarship", "grant", "tax refund", "insurance claim", "settlement", "royalty", "licensing", "paycheck deposit", "earnings deposit", "earnings credit"]
+    },
+    {
+      "id": 8,
+      "name": "Government & Legal",
+      "description": "Taxes, licenses, legal services, government fees",
+      "keywords": ["tax", "government", "passport", "license", "visa", "court", "legal", "notary", "service", "registration", "permit", "renewal", "penalty", "fine", "attorney", "administrative", "charge", "fee"]
+    },
+    {
+      "id": 9,
+      "name": "Charity & Donations",
+      "description": "Charitable, religious, community, political donations",
+      "keywords": ["donation", "charity", "temple", "church", "ngo", "fundraising", "gofundme", "kickstarter", "gift", "offering", "walk", "dinner", "auction", "volunteer", "community", "cause", "environmental", "research", "relief", "red cross"]
+    }
+  ],
+  "metadata": {
+    "total_categories": 10,
+    "version": "1.1.0",
+    "created_date": "2025-10-14",
+    "last_updated": "2025-10-14",
+    "description": "Comprehensive transaction categorization system with 10 main categories covering all major financial transaction types. Updated with enhanced keywords and real transaction data integration.",
+    "total_records": 4501043,
+    "countries": ["USA", "UK", "CANADA", "AUSTRALIA", "INDIA"],
+    "currencies": ["USD", "GBP", "CAD", "AUD", "INR"],
+    "data_sources": ["synthetic_generation", "external_hf_dataset"]
+  }
+}

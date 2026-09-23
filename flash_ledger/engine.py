@@ -199,7 +199,8 @@ class JevDecisionEngine:
             for w in [
                 "blue bottle", "coffee", "starbucks", "bakery", "tartine", "cafe",
                 "restaurant", "grill", "bistro", "sweetgreen", "chipotle", "doordash",
-                "eats", "dining", "lunch", "dinner", "catering"
+                "eats", "dining", "lunch", "dinner", "catering", "arby", "potbelly",
+                "dairy queen", "mcdonald", "burger", "pizza", "subway", "wendy", "dunkin"
             ]
         ):
             gl_code = "Meals & Entertainment"
@@ -230,12 +231,12 @@ class JevDecisionEngine:
             tax_prob = 0.98
             risk_score = 0.05
             exp_type = "OpEx"
-        elif any(w in text for w in ["cooley", "gusto", "carta", "legal", "cpa", "accounting", "audit"]):
+        elif any(w in text for w in ["cooley", "gusto", "carta", "legal", "cpa", "accounting", "audit", "medical", "therapy", "clinic", "doctor"]):
             gl_code = "Professional Fees"
             tax_prob = 0.99
             risk_score = 0.03
             exp_type = "OpEx"
-        elif any(w in text for w in ["at&t", "verizon", "t-mobile", "comcast", "internet", "telecom"]):
+        elif any(w in text for w in ["at&t", "verizon", "t-mobile", "comcast", "internet", "telecom", "starlink", "spectrum", "vodafone"]):
             gl_code = "Utilities & Telecommunications"
             tax_prob = 0.95
             risk_score = 0.05

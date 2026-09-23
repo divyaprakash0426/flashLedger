@@ -54,7 +54,13 @@ def download_hf_dataset(
     Attempt to download mitulshah/transaction-categorization from Hugging Face.
     Note: Gated dataset requiring an HF token associated with an account that clicked 'Agree'.
     """
-    hf_token = token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+    import huggingface_hub
+    hf_token = (
+        token
+        or os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+        or huggingface_hub.get_token()
+    )
 
     if dest_path:
         out = Path(dest_path)
