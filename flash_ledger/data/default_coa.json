@@ -1,0 +1,90 @@
+{
+  "name": "Standard US GAAP & IRS Business Chart of Accounts",
+  "capex_threshold": 2500.0,
+  "accounts": [
+    {
+      "code": "6010",
+      "name": "Software/SaaS",
+      "description": "Cloud hosting, developer tools, subscriptions, SaaS products (AWS, GitHub, Slack, Notion, OpenAI)",
+      "tax_deductible_default": true,
+      "category": "Technology & Hosting"
+    },
+    {
+      "code": "6020",
+      "name": "Meals & Entertainment",
+      "description": "Business client dining, coffee meetings, staff meals, food delivery (Blue Bottle, Starbucks, Uber Eats)",
+      "tax_deductible_default": true,
+      "category": "Operating Expenses"
+    },
+    {
+      "code": "6030",
+      "name": "Office Supplies",
+      "description": "Stationery, desk accessories, minor consumables, printer paper (Amazon, Staples, Target)",
+      "tax_deductible_default": true,
+      "category": "Operating Expenses"
+    },
+    {
+      "code": "6040",
+      "name": "Travel",
+      "description": "Flights, hotels, lodging, train tickets, rental cars (United Airlines, Airbnb, Marriott, Delta)",
+      "tax_deductible_default": true,
+      "category": "Operating Expenses"
+    },
+    {
+      "code": "6050",
+      "name": "Transportation & Rideshare",
+      "description": "Local transit, taxis, rideshares, parking, tolls (Uber, Lyft, Fastrak, Lime)",
+      "tax_deductible_default": true,
+      "category": "Operating Expenses"
+    },
+    {
+      "code": "6060",
+      "name": "Advertising & Marketing",
+      "description": "Digital ads, sponsor packages, campaigns, promotional media (Google Ads, Meta Ads, Twitter Ads)",
+      "tax_deductible_default": true,
+      "category": "Sales & Marketing"
+    },
+    {
+      "code": "6070",
+      "name": "Professional Fees",
+      "description": "Legal counsel, accounting services, tax prep, audit consultants (Gusto, Carta, Cooley, Stripe Legal)",
+      "tax_deductible_default": true,
+      "category": "General & Administrative"
+    },
+    {
+      "code": "6080",
+      "name": "Hardware & Equipment",
+      "description": "Laptops, monitors, smartphones, server hardware (Apple Store, Best Buy, Dell)",
+      "tax_deductible_default": true,
+      "category": "Capital Assets / Equipment"
+    },
+    {
+      "code": "6090",
+      "name": "Utilities & Telecommunications",
+      "description": "Internet service, phone bills, cellular data, office electricity (AT&T, Verizon, Comcast, PG&E)",
+      "tax_deductible_default": true,
+      "category": "Operating Expenses"
+    },
+    {
+      "code": "6100",
+      "name": "Dues & Subscriptions",
+      "description": "Professional memberships, trade association fees, business certifications",
+      "tax_deductible_default": true,
+      "category": "General & Administrative"
+    },
+    {
+      "code": "6110",
+      "name": "Bank & Merchant Fees",
+      "description": "Wire transfer charges, card processing fees, foreign transaction charges (Stripe Fees, Chase Wire)",
+      "tax_deductible_default": true,
+      "category": "Financial Services"
+    },
+    {
+      "code": "6120",
+      "name": "Personal / Non-Deductible",
+      "description": "Personal expenses, gambling, casino, luxury items, non-business withdrawals",
+      "tax_deductible_default": false,
+      "category": "Non-Operating / Draws"
+    }
+  ]
+}
