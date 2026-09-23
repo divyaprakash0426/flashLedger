@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import os
+import shutil
 import urllib.request
 from pathlib import Path
 from typing import Optional
@@ -33,7 +34,6 @@ def download_uk_gov_data(dest_path: Optional[str | Path] = None) -> Path:
                 f.write(content)
         return out
     except Exception as e:
-        # If network error, create a fallback sample of UK Gov data
         sample_content = (
             "Department Family,Entity,Date,Expense Type,Expense Area,Supplier,Transaction Number,Amount,Description\n"
             'Department for Education,Core,05/03/2024,Other Costs,Operational Finance,Agile Management Solutions Ltd,CORE-PINV-074083,"4,878.20",Software Development\n'
@@ -45,10 +45,14 @@ def download_uk_gov_data(dest_path: Optional[str | Path] = None) -> Path:
         return out
 
 
-def download_hf_dataset(dest_path: Optional[str | Path] = None, token: Optional[str] = None) -> Path:
+def download_hf_dataset(
+    dest_path: Optional[str | Path] = None,
+    token: Optional[str] = None,
+    include_parquet: bool = True,
+) -> Path:
     """
     Attempt to download mitulshah/transaction-categorization from Hugging Face.
-    Note: This is a gated dataset requiring an HF token and agreement to terms.
+    Note: Gated dataset requiring an HF token associated with an account that clicked 'Agree'.
     """
     hf_token = token or os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
 
@@ -60,13 +64,14 @@ def download_hf_dataset(dest_path: Optional[str | Path] = None, token: Optional[
     out.parent.mkdir(parents=True, exist_ok=True)
 
     if not hf_token:
-        # Save informative notice and fallback structure
         fallback_info = {
             "dataset": "mitulshah/transaction-categorization",
             "status": "GATED_DATASET_AUTH_REQUIRED",
             "instruction": (
-                "To download the full 4.5M record dataset, log in at https://huggingface.co/datasets/mitulshah/transaction-categorization, "
-                "accept dataset terms, and set 'HF_TOKEN=<your_token>' in your environment or pass --token to flash-ledger download-dataset."
+                "You have access on Hugging Face, but the CLI/Python client needs your HF User Access Token.\n"
+                "1. Generate a token at: https://huggingface.co/settings/tokens\n"
+                "2. Pass it via: flash-ledger download-dataset --source hf --token <token>\n"
+                "   or set in shell: $env.HF_TOKEN = '<token>' (Nushell) / export HF_TOKEN='<token>' (Bash)"
             ),
             "fallback_available": True,
             "sample_categories": [
@@ -89,14 +94,38 @@ def download_hf_dataset(dest_path: Optional[str | Path] = None, token: Optional[
 
     try:
         from huggingface_hub import hf_hub_download
-        downloaded = hf_hub_download(
+
+        # 1. Download categories.json
+        cat_file = hf_hub_download(
             repo_id="mitulshah/transaction-categorization",
             filename="categories.json",
             token=hf_token,
             repo_type="dataset",
         )
-        import shutil
-        shutil.copy(downloaded, out)
+        shutil.copy(cat_file, out)
+
+        # 2. Download 0000.parquet if requested
+        if include_parquet:
+            parquet_dest = out.parent / "mitulshah_train.parquet"
+            downloaded_parquet = hf_hub_download(
+                repo_id="mitulshah/transaction-categorization",
+                filename="default/train/0000.parquet",
+                token=hf_token,
+                repo_type="dataset",
+            )
+            shutil.copy(downloaded_parquet, parquet_dest)
+
+            # Convert first 5,000 rows to CSV for instant classification
+            try:
+                import pyarrow.parquet as pq
+                table = pq.read_table(downloaded_parquet)
+                slice_table = table.slice(0, 5000)
+                csv_dest = out.parent / "mitulshah_sample.csv"
+                import pyarrow.csv as pcsv
+                pcsv.write_csv(slice_table, csv_dest)
+            except Exception:
+                pass
+
         return out
     except Exception as e:
         import json
