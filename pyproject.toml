@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flash-ledger"
+version = "0.1.0"
+description = "Autonomous Bank Feed & Card Auditor powered by TypeSafe Jev"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "Divyaprakash", email = "divyaprakash0426@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "typesafe-sdk>=0.1.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.7.0",
+    "rich>=13.7.0",
+    "typer>=0.12.0",
+    "mcp>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "respx>=0.21.0",
+    "huggingface_hub>=0.23.0",
+]
+
+[project.scripts]
+flash-ledger = "flash_ledger.cli:app"
+flashledger = "flash_ledger.cli:app"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
