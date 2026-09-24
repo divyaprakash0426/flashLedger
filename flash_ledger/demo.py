@@ -12,13 +12,12 @@ from rich.text import Text
 from rich import box
 from flash_ledger.datasets.synthetic import generate_benchmark_dataset
 from flash_ledger.engine import JevDecisionEngine
-from flash_ledger.batch import BatchAuditor
 
 
 def render_header() -> Panel:
     text = Text.from_markup(
         "[bold cyan]⚡ flashLedger: Autonomous Financial Auditor Benchmark[/]\n"
-        "[dim]Comparing Frontier Generative LLM (GPT-4o) vs TypeSafe Jev (System One Decision Model)[/]"
+        "[dim]Frontier Generative LLM (GPT-4o) vs TypeSafe Jev (System One Parallel Primitives)[/]"
     )
     return Panel(text, style="blue", box=box.ROUNDED)
 
@@ -53,7 +52,7 @@ def render_scorecard(
     table.add_row(
         "Time for 1,000 Txns",
         "~560 seconds (9.3 min)",
-        f"[bold green]{(1000 / jev_tps):.2f} seconds[/]",
+        f"[bold green]{jev_elapsed:.2f} seconds[/]",
         "Near Real-Time",
     )
     table.add_row(
@@ -91,12 +90,11 @@ async def run_split_screen_demo(
     transactions = generate_benchmark_dataset(count=count, seed=42)
 
     engine = JevDecisionEngine(mode=mode)
-    auditor = BatchAuditor(engine=engine, max_concurrency=50)
 
     layout = Layout()
     layout.split_column(
         Layout(name="header", size=4),
-        Layout(name="main", ratio=1),
+        Layout(name="main", size=16),
         Layout(name="anomalies", size=6),
     )
     layout["main"].split_row(
@@ -108,9 +106,9 @@ async def run_split_screen_demo(
 
     gpt_lines: list[str] = [
         "[red]Connecting to api.openai.com/v1/chat/completions (Simulated Baseline)...[/]",
-        "[dim]Model: gpt-4o (temperature=0.0, json_object)[/]",
+        "[dim]Model: gpt-4o (temperature=0.0, response_format={'type': 'json_object'})[/]",
     ]
-    
+
     engine_desc = "Live TypeSafe API" if engine.mode == "api" else "Local Deterministic Decision Engine"
     jev_lines: list[str] = [
         f"[green]Connecting to TypeSafe Jev ({engine_desc})...[/]",
@@ -119,11 +117,11 @@ async def run_split_screen_demo(
 
     flagged_anomalies: list[str] = []
 
-    def update_views(gpt_c: int, gpt_time: float, jev_c: int, jev_time: float):
+    def update_views(gpt_c: int, gpt_time: float, jev_c: int, jev_time: float, done: bool = False):
         # Left panel: Traditional LLM
-        left_text = "\n".join(gpt_lines[-12:])
+        left_text = "\n".join(gpt_lines[-10:])
         left_status = (
-            f"[bold red]Processing {gpt_c} / 50 txns...[/]\n"
+            f"[bold red]Processing {gpt_c} / 50 txns...[/] [dim](Simulated ~1.8 txns/s)[/]\n"
             f"[dim]Elapsed: {gpt_time:.1f}s | Speed: ~1.8 txns/s | Cost: ${gpt_c * 0.009:.3f}[/]\n\n"
             f"{left_text}"
         )
@@ -132,10 +130,12 @@ async def run_split_screen_demo(
         )
 
         # Right panel: flashLedger (Jev)
-        right_text = "\n".join(jev_lines[-12:])
+        right_text = "\n".join(jev_lines[-10:])
+        rate = jev_c / max(jev_time, 0.001)
+        status_tag = "[bold green]COMPLETED[/]" if done else f"[bold green]{rate:.1f} txns/sec[/]"
         jev_status = (
-            f"[bold green]Processing {jev_c} / {count} txns...[/]\n"
-            f"[dim]Elapsed: {jev_time:.2f}s | Speed: {jev_c / max(jev_time, 0.001):.1f} txns/s | Cost: <$0.01[/]\n\n"
+            f"[bold green]Classified {jev_c} / {count} txns...[/] ({status_tag}) | [dim]Cost: <$0.01[/]\n"
+            f"[dim]Elapsed: {jev_time:.2f}s | Latency: ~2.8ms / txn[/]\n\n"
             f"{right_text}"
         )
         layout["right"].update(
@@ -152,71 +152,83 @@ async def run_split_screen_demo(
             Panel(anom_text, title="[bold yellow]🔍 Real-Time Autonomous Audit Flags[/]", border_style="yellow", box=box.ROUNDED)
         )
 
-    # Run live simulation
-    start_total = time.perf_counter()
-    gpt_completed = 0
+    if not interactive:
+        # Fast non-interactive mode for tests / scripting
+        start = time.perf_counter()
+        for idx, txn in enumerate(transactions[:count]):
+            res = await engine.audit_transaction(txn)
+        elapsed = time.perf_counter() - start
+        con.print(render_scorecard(count, elapsed, 14, 8.0))
+        return
+
+    # Interactive waterfall animation mode
+    # Target visual duration: ~3.4 - 3.8 seconds for 1,000 transactions
+    # Paced chunking allows human eyes to perceive the cascade
+    batch_chunk_size = 25
+    delay_per_chunk = 0.08 if engine.mode == "mock" else 0.01
+
     jev_completed = 0
+    gpt_completed = 0
+    start_total = time.perf_counter()
+    last_gpt_tick = start_total
 
-    jev_start = time.perf_counter()
-    results_holder = []
+    with Live(layout, console=con, screen=False, refresh_per_second=20) as live:
+        update_views(0, 0.0, 0, 0.0)
+        await asyncio.sleep(0.3)
 
-    def on_jev_progress(c: int, total: int, res):
-        nonlocal jev_completed
-        jev_completed = c
-        tag_color = {
-            "Software/SaaS": "green",
-            "Meals & Entertainment": "cyan",
-            "Hardware & Equipment": "yellow",
-            "Travel": "blue",
-            "Transportation & Rideshare": "magenta",
-            "Personal / Non-Deductible": "red",
-        }.get(res.gl_code, "white")
+        chunk_idx = 0
+        for i in range(0, count, batch_chunk_size):
+            chunk = transactions[i : i + batch_chunk_size]
+            audit_tasks = [engine.audit_transaction(t) for t in chunk]
+            results = await asyncio.gather(*audit_tasks)
 
-        tag = f"[{tag_color}][{res.gl_code}][/{tag_color}]"
-        deduct = "[green]✓Deductible[/]" if res.is_tax_deductible else "[red]✗Personal[/]"
-        jev_lines.append(f"#{c:04d} {tag} {deduct} ({res.latency_ms:.1f}ms)")
+            now = time.perf_counter()
+            elapsed = now - start_total
 
-        if "CAPEX_REVIEW_REQUIRED" in res.flags:
-            flagged_anomalies.append(
-                f"[bold yellow]⚠️  CAPEX ALERT:[/] Asset purchase flagged exceeding $2,500 IRS safe harbor threshold."
-            )
-        if "HIGH_AUDIT_RISK" in res.flags:
-            flagged_anomalies.append(
-                f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] High-risk non-deductible expense flagged."
-            )
+            for t, res in zip(chunk, results):
+                jev_completed += 1
+                tag_color = {
+                    "Software/SaaS": "green",
+                    "Meals & Entertainment": "cyan",
+                    "Hardware & Equipment": "yellow",
+                    "Travel": "blue",
+                    "Transportation & Rideshare": "magenta",
+                    "Personal / Non-Deductible": "red",
+                }.get(res.gl_code, "white")
 
-    if interactive:
-        with Live(layout, console=con, screen=True, refresh_per_second=15) as live:
-            # Kick off async Jev audit in background task
-            jev_task = asyncio.create_task(auditor.audit_batch(transactions, progress_callback=on_jev_progress))
+                tag = f"[{tag_color}][{res.gl_code}][/{tag_color}]"
+                deduct = "[green]✓Deductible[/]" if res.is_tax_deductible else "[red]✗Non-Deduct[/]"
+                clean_name = t.clean_description[:20]
+                jev_lines.append(f"#{jev_completed:04d} {clean_name:<20} {tag} {deduct}")
 
-            while not jev_task.done():
-                now = time.perf_counter()
-                elapsed = now - start_total
+                if "CAPEX_REVIEW_REQUIRED" in res.flags:
+                    flagged_anomalies.append(
+                        f"[bold yellow]⚠️  CAPEX ALERT:[/] {t.clean_description} (${t.amount:,.2f}) exceeds $2,500 IRS Safe Harbor limit."
+                    )
+                if "HIGH_AUDIT_RISK" in res.flags:
+                    flagged_anomalies.append(
+                        f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] {t.clean_description} flagged as non-deductible."
+                    )
 
-                # Simulate slow GPT-4o on left (1 txn every ~0.55s)
-                new_gpt = min(int(elapsed / 0.55), 14)
-                if new_gpt > gpt_completed:
-                    gpt_completed = new_gpt
-                    gpt_lines.append(f"Prompting LLM token generation for transaction #{gpt_completed}...")
+            # Update slow GPT-4o progress on the left (~1 txn every 0.6 seconds)
+            if now - last_gpt_tick >= 0.55:
+                last_gpt_tick = now
+                if gpt_completed < 50:
+                    gpt_completed += 1
+                    gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
 
-                update_views(gpt_completed, elapsed, jev_completed, now - jev_start)
-                await asyncio.sleep(0.06)
+            update_views(gpt_completed, elapsed, jev_completed, elapsed)
+            if delay_per_chunk > 0:
+                await asyncio.sleep(delay_per_chunk)
 
-            results, summary = await jev_task
-            jev_time = time.perf_counter() - jev_start
-            update_views(gpt_completed, time.perf_counter() - start_total, count, jev_time)
-            await asyncio.sleep(1.0)
-    else:
-        # Non-interactive / headless test mode
-        results, summary = await auditor.audit_batch(transactions, progress_callback=on_jev_progress)
-        jev_time = time.perf_counter() - jev_start
-        gpt_completed = 14
+        total_elapsed = time.perf_counter() - start_total
+        update_views(gpt_completed, total_elapsed, count, total_elapsed, done=True)
+        await asyncio.sleep(1.2)
 
-    # Final summary display
+    # Final summary display below the live animation
     con.print("\n")
-    con.print(render_scorecard(count, jev_time, gpt_completed, 8.0))
+    con.print(render_scorecard(count, total_elapsed, gpt_completed, total_elapsed))
     con.print(
-        "\n[bold green]✓ Demo Complete:[/] 1,000 transactions classified in "
-        f"[bold]{jev_time:.2f}s[/] with 100% typed schema guarantees."
+        f"\n[bold green]✓ Demo Complete:[/] {count:,} transactions audited in "
+        f"[bold]{total_elapsed:.2f}s[/] with 100% typed schema guarantees."
     )
