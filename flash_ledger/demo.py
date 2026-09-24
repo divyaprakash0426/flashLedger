@@ -103,8 +103,9 @@ async def run_split_screen_demo(
     layout = Layout()
     layout.split_column(
         Layout(name="header", size=3),
-        Layout(name="main", size=8),
-        Layout(name="bottom", size=11),
+        Layout(name="main", size=7),
+        Layout(name="tax", size=4),
+        Layout(name="scorecard", size=10),
     )
     layout["main"].split_row(
         Layout(name="left", ratio=1),
@@ -129,6 +130,17 @@ async def run_split_screen_demo(
     risk_count = 0
 
     def update_views(gpt_c: int, gpt_time: float, jev_c: int, jev_time: float, done: bool = False):
+        # Header update
+        if done:
+            layout["header"].update(
+                Panel(
+                    f"[bold green]⚡ flashLedger: ALL {count:,} TXNS AUDITED IN {jev_time:.2f}s![/] "
+                    f"[dim]| Traditional LLM still crawling (~9.3 min for 1k txns) [Press Ctrl+C to stop][/]",
+                    box=box.ROUNDED,
+                    style="green",
+                )
+            )
+
         # Left panel: Traditional LLM
         left_text = "\n".join(gpt_lines[-3:])
         if done:
@@ -171,34 +183,23 @@ async def run_split_screen_demo(
             Panel(jev_status, title=right_title, border_style="green", box=box.ROUNDED)
         )
 
-        # Bottom panel: Live Anomalies during animation, or Scorecard when complete
-        if done:
-            layout["header"].update(
-                Panel(
-                    f"[bold green]⚡ flashLedger: ALL {count:,} TXNS AUDITED IN {jev_time:.2f}s![/] "
-                    f"[dim]| Traditional LLM still crawling (~9.3 min for 1k txns) [Press Ctrl+C to stop][/]",
-                    box=box.ROUNDED,
-                    style="green",
-                )
-            )
-            layout["bottom"].update(render_scorecard(count, jev_time, gpt_c, gpt_time, gpt_done=False))
-        else:
-            speedup = rate / 1.8 if rate > 0 else 0
-            anom_text = (
-                "\n".join(flagged_anomalies[-2:])
-                if flagged_anomalies
-                else "[dim italic]Auditing transactions in parallel for IRS CapEx thresholds ($2,500 Safe Harbor) and tax risk...[/]"
-            )
-            anom_content = (
-                f"[bold cyan]⚡ Real-Time Speedup:[/] [bold]{speedup:.0f}x Faster[/]  "
-                f"[dim]|[/]  [bold green]💰 Cost Savings:[/] [bold]>99.9% cheaper[/]  "
-                f"[dim]|[/]  [bold magenta]🔒 Guarantee:[/] [bold]100% Typed Strict Enum[/]\n\n"
-                f"{anom_text}\n\n"
-                f"[dim]Continuous parallel audit: {capex_count} CapEx reviews flagged, {risk_count} tax audit risks detected.[/]"
-            )
-            layout["bottom"].update(
-                Panel(anom_content, title="[bold yellow]🔍 Real-Time Autonomous Audit Flags & Live Telemetry[/]", border_style="yellow", box=box.ROUNDED)
-            )
+        # Tax auditor data panel: visible throughout the entire demo!
+        anom_text = (
+            "\n".join(flagged_anomalies[-2:])
+            if flagged_anomalies
+            else "[dim italic]Auditing transactions in parallel for IRS CapEx limits ($2,500 Safe Harbor) and tax risk...[/]"
+        )
+        tax_title = f"[bold yellow]🔍 Autonomous Tax Auditor & Compliance Flags [{capex_count} CapEx • {risk_count} Risks • 100% Tax Mapped][/]"
+        layout["tax"].update(
+            Panel(anom_text, title=tax_title, border_style="yellow", box=box.ROUNDED)
+        )
+
+        # Economics Scorecard panel: visible throughout and live updating!
+        active_jev_time = jev_time if done else max(jev_time, 0.001)
+        active_jev_count = count if done else max(jev_c, 1)
+        layout["scorecard"].update(
+            render_scorecard(active_jev_count, active_jev_time, gpt_c, gpt_time, gpt_done=False)
+        )
 
     if not interactive:
         # Fast non-interactive mode for tests / scripting
@@ -254,12 +255,12 @@ async def run_split_screen_demo(
                     if "CAPEX_REVIEW_REQUIRED" in res.flags:
                         capex_count += 1
                         flagged_anomalies.append(
-                            f"[bold yellow]⚠️  CAPEX ALERT:[/] {t.clean_description} (${t.amount:,.2f}) exceeds $2,500 IRS Safe Harbor limit."
+                            f"[bold yellow]⚠️  CAPEX ALERT:[/] {t.clean_description[:25]} (${t.amount:,.0f}) > $2,500 Safe Harbor limit"
                         )
                     if "HIGH_AUDIT_RISK" in res.flags:
                         risk_count += 1
                         flagged_anomalies.append(
-                            f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] {t.clean_description} flagged as non-deductible."
+                            f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] {t.clean_description[:22]} flagged non-deductible"
                         )
 
                 # Update slow GPT-4o progress on the left (~1 txn every 0.6 seconds)
