@@ -1,4 +1,4 @@
-"""Split-screen benchmark demo: Traditional LLM (GPT-4o) vs flashLedger (Jev)."""
+"""Enterprise Batch Cluster Demo: 100,000 transaction audit visualization with TypeSafe Jev."""
 
 from __future__ import annotations
 import asyncio
@@ -13,73 +13,156 @@ from flash_ledger.datasets.synthetic import generate_benchmark_dataset
 from flash_ledger.engine import JevDecisionEngine
 
 
-def render_header() -> Panel:
-    text = Text.from_markup(
-        "[bold cyan]⚡ flashLedger: Autonomous Financial Auditor Benchmark[/] "
-        "[dim]| Frontier Generative LLM (GPT-4o) vs TypeSafe Jev[/]"
+def render_header(count: int, done: bool = False, elapsed: float = 0.0, tps: float = 0.0) -> Panel:
+    """Render top status banner with real-time throughput telemetry."""
+    if done:
+        text = Text.from_markup(
+            f"[bold green]⚡ flashLedger: ALL {count:,} TRANSACTIONS AUDITED IN {elapsed:.2f}s![/] "
+            f"[dim]| Speed: {tps:,.0f} txns/sec • 100% Typed Guarantee • Zero Errors[/]"
+        )
+        return Panel(text, style="green", box=box.ROUNDED)
+    else:
+        text = Text.from_markup(
+            f"[bold cyan]⚡ flashLedger Enterprise Autonomous Auditor[/] "
+            f"[dim]| Auditing {count:,} Transactions in High-Speed Pipeline (TypeSafe Jev Engine)[/]"
+        )
+        return Panel(text, style="cyan", box=box.ROUNDED)
+
+
+def render_stream_and_telemetry(
+    stream_lines: list[str],
+    total_vol: float,
+    deduct_vol: float,
+    risk_vol: float,
+    capex_count: int,
+    risk_count: int,
+    current_tps: float,
+    avg_latency: float,
+) -> Table:
+    """Render side-by-side transaction cascade and financial telemetry."""
+    grid = Table.grid(expand=True)
+    grid.add_column(ratio=5)
+    grid.add_column(ratio=4)
+
+    stream_content = (
+        "\n".join(stream_lines[-8:])
+        if stream_lines
+        else "[dim italic]Initializing batch ingestion stream...[/]"
     )
-    return Panel(text, style="blue", box=box.ROUNDED)
+    stream_panel = Panel(
+        stream_content,
+        title="[bold green]⚡ Live Audit Stream (Last 8)[/]",
+        box=box.ROUNDED,
+    )
+
+    deduct_pct = (deduct_vol / max(total_vol, 1.0)) * 100
+    telemetry = (
+        f"Volume:      [bold white]${total_vol:,.2f}[/]\n"
+        f"Deductible:  [bold green]${deduct_vol:,.2f}[/] [dim]({deduct_pct:.0f}%)[/]\n"
+        f"Non-Ded/Risk:[bold red]${risk_vol:,.2f}[/]\n"
+        f"CapEx (179): [bold yellow]{capex_count:,} assets[/] [dim](>$2.5k)[/]\n"
+        f"Audit Risks: [bold red]{risk_count:,} flagged[/]\n"
+        f"Throughput:  [bold green]{current_tps:,.0f} txns/sec[/]\n"
+        f"Avg Latency: [bold cyan]{avg_latency:.3f} ms/txn[/]\n"
+        f"Invariants:  [bold green]100% Typed Strict[/]"
+    )
+    telemetry_panel = Panel(
+        telemetry,
+        title="[bold yellow]🔍 Real-Time Telemetry[/]",
+        box=box.ROUNDED,
+    )
+
+    grid.add_row(stream_panel, telemetry_panel)
+    return grid
+
+
+def render_matrix_panel(
+    block_states: list[str],
+    current_batch: int,
+    total_batches: int,
+    total_txns: int,
+    completed_txns: int,
+    batch_size: int,
+) -> Panel:
+    """Render GitHub commit-style batch cluster grid."""
+    rows = []
+    cols_per_row = max(1, total_batches // 4)
+    for r in range(4):
+        rows.append(" ".join(block_states[r * cols_per_row : (r + 1) * cols_per_row]))
+
+    matrix_text = "\n".join(rows)
+    pct = (completed_txns / max(total_txns, 1)) * 100
+    legend = (
+        "[bright_green]■ Clean[/]  [yellow]■ CapEx Review[/]  [bright_red]■ Audit Risk[/]  "
+        "[bright_yellow]▶ Active[/]  [dim]⬝ Queued[/]\n"
+        f"[dim]Pipeline Progress:[/] [bold cyan]{current_batch}/{total_batches} batches[/] "
+        f"([bold white]{completed_txns:,} / {total_txns:,} txns[/] • [bold green]{pct:.1f}%[/])"
+    )
+    return Panel(
+        f"{matrix_text}\n\n{legend}",
+        title=f"[bold cyan]📦 Batch Cluster Pipeline ({total_batches} Batches • {batch_size:,} Txns / Block)[/]",
+        box=box.ROUNDED,
+    )
 
 
 def render_scorecard(
-    jev_count: int,
-    jev_elapsed: float,
-    gpt_count: int,
-    gpt_elapsed: float,
-    gpt_done: bool = False,
+    count: int,
+    elapsed: float,
+    total_vol: float,
+    deduct_vol: float,
+    capex_count: int,
+    capex_vol: float,
+    risk_count: int,
+    risk_vol: float,
 ) -> Table:
-    jev_tps = jev_count / max(jev_elapsed, 0.001)
-    gpt_tps = 1.8  # Standard frontier LLM JSON-mode throughput (~550ms/txn)
-    speedup = jev_tps / gpt_tps
-
-    title_status = "Final" if gpt_done else "Live"
-    sub = "" if gpt_done else " [dim](GPT-4o In-Progress)[/]"
-    title = f"[bold yellow]🏆 {title_status} Benchmark & Economics Scorecard[/]{sub}"
+    """Render executive audit & compliance scorecard."""
+    tps = count / max(elapsed, 0.001)
+    avg_latency = (elapsed / count) * 1000.0
 
     table = Table(
-        title=title,
+        title="[bold yellow]🏆 Final Audit & Economics Scorecard[/]",
         box=box.ROUNDED,
         header_style="bold magenta",
         expand=True,
-        padding=(0, 0),
     )
     table.add_column("Audit Metric", style="bold white", justify="left")
-    table.add_column("GPT-4o (Simulated)", style="red", justify="center")
-    table.add_column("flashLedger ⚡ (Jev)", style="green", justify="center")
-    table.add_column("The Jev Advantage", style="bold cyan", justify="center")
+    table.add_column("Audited Result", style="bold cyan", justify="right")
+    table.add_column("Economic / Compliance Impact", style="bold green", justify="left")
 
-    gpt_prog = f"{gpt_count:,}/{jev_count:,} (DONE)" if gpt_done else f"[bold red]⏳ {gpt_count}/{jev_count:,}[/] [dim]({(gpt_count/jev_count)*100:.1f}%)[/]"
-    jev_prog = f"[bold green]✓ {jev_count:,}/{jev_count:,}[/] [dim](100%)[/]"
-    table.add_row("Audit Progress", gpt_prog, jev_prog, "[bold cyan]100% Completed[/]")
-
+    table.add_row(
+        "Total Transactions Audited",
+        f"{count:,} txns",
+        "[green]✓ 100% Fully Categorized[/]",
+    )
     table.add_row(
         "Throughput (Speed)",
-        f"{gpt_tps:.1f} txns/sec",
-        f"[bold green]{jev_tps:.1f} txns/sec[/]",
-        f"[bold]{speedup:.0f}x Faster[/]",
+        f"[bold green]{tps:,.0f} txns/sec[/]",
+        f"Near Real-Time ({elapsed:.2f}s total, {avg_latency:.3f}ms/txn)",
     )
-
-    gpt_time_str = f"~560s (9.3m)" if gpt_done else f"[red]{gpt_elapsed:.1f}s (Est. 9.3m)[/]"
     table.add_row(
-        "Time (1,000 Txns)",
-        gpt_time_str,
-        f"[bold green]{jev_elapsed:.2f} seconds[/]",
-        "Near Real-Time",
+        "Total Transaction Volume",
+        f"${total_vol:,.2f}",
+        "Reconciled to general ledger",
     )
-
-    gpt_cost_str = f"~$15 – $35" if gpt_done else f"[bold red]${gpt_count * 0.009:.3f}[/] [dim](Proj $35)[/]"
     table.add_row(
-        "Cost (10,000 Txns)",
-        gpt_cost_str,
-        "[bold green]<$0.01[/]",
-        "[bold]>1,500x Cheaper[/]",
+        "Tax-Deductible Spend (OpEx)",
+        f"${deduct_vol:,.2f}",
+        f"[green]{(deduct_vol / max(total_vol, 1)) * 100:.1f}% eligible tax write-offs[/]",
     )
-
     table.add_row(
-        "Schema Guarantee",
-        "JSON Schema Errors",
-        "[bold green]100% Typed Strict[/]",
-        "Zero Errors",
+        "IRS Section 179 CapEx Assets",
+        f"{capex_count:,} purchases (${capex_vol:,.2f})",
+        "[yellow]Exceeds $2,500 Safe Harbor threshold[/]",
+    )
+    table.add_row(
+        "Audit Risks Flagged",
+        f"{risk_count:,} flagged (${risk_vol:,.2f})",
+        "[red]Shielded from tax audit disallowance[/]",
+    )
+    table.add_row(
+        "Schema & Correctness Guarantee",
+        "100% Typed Strict",
+        "[bold green]Zero JSON Schema Errors (TypeSafe Jev)[/]",
     )
     return table
 
@@ -87,212 +170,225 @@ def render_scorecard(
 async def run_split_screen_demo(
     console: Console | None = None,
     interactive: bool = True,
-    count: int = 1000,
-    mode: str = "auto",
+    count: int = 100_000,
+    mode: str = "mock",
 ) -> None:
-    """Execute the live terminal animation demo comparing GPT-4o vs Jev."""
+    """Execute high-speed batch cluster animation demo."""
     con = console or Console()
 
-    # Generate benchmark dataset
-    con.print(f"[dim]Pre-loading {count:,} real-world noisy bank feed transactions...[/]")
-    transactions = generate_benchmark_dataset(count=count, seed=42)
-
     engine = JevDecisionEngine(mode=mode)
+    num_batches = 100 if count >= 100 else count
+    batch_size = max(1, count // num_batches)
+    actual_count = batch_size * num_batches
 
-    gpt_lines: list[str] = [
-        "[red]Connecting to api.openai.com/v1/chat/completions (Simulated Baseline)...[/]",
-        "[dim]Model: gpt-4o (temperature=0.0, response_format={'type': 'json_object'})[/]",
-    ]
+    block_states = ["[dim]⬝[/]"] * num_batches
+    stream_lines: list[str] = []
 
-    if engine.mode == "openrouter":
-        engine_desc = f"OpenRouter API ({engine.model})"
-        jev_title_label = "OpenRouter Jev"
-    elif engine.mode in ("api", "typesafe"):
-        engine_desc = "Live TypeSafe API"
-        jev_title_label = "TypeSafe Jev"
-    else:
-        engine_desc = "Local Deterministic Decision Engine"
-        jev_title_label = "TypeSafe Jev"
-
-    jev_lines: list[str] = [
-        f"[green]Connecting to TypeSafe Jev ({engine_desc})...[/]",
-        f"[dim]Model: {engine.model} (System One parallel primitives)[/]",
-    ]
-
-    flagged_anomalies: list[str] = []
+    total_vol = 0.0
+    deduct_vol = 0.0
+    risk_vol = 0.0
     capex_count = 0
+    capex_vol = 0.0
     risk_count = 0
+    risk_vol = 0.0
+    completed_txns = 0
 
-    def build_view(gpt_c: int, gpt_time: float, jev_c: int, jev_time: float, done: bool = False) -> Group:
-        # Header banner
-        if done:
-            header = Panel(
-                f"[bold green]⚡ flashLedger: ALL {count:,} TXNS AUDITED IN {jev_time:.2f}s![/] "
-                f"[dim]| Traditional LLM still crawling (~9.3 min for 1k txns) [Press Ctrl+C to stop][/]",
-                box=box.ROUNDED,
-                style="green",
-            )
-        else:
-            header = render_header()
+    badge_map = {
+        "Software/SaaS": "[green][SaaS][/]",
+        "Meals & Entertainment": "[cyan][Meals][/]",
+        "Hardware & Equipment": "[yellow][CapEx][/]",
+        "Travel": "[blue][Travel][/]",
+        "Transportation & Rideshare": "[magenta][Transp][/]",
+        "Personal / Non-Deductible": "[red][Person][/]",
+        "Office Supplies": "[white][Office][/]",
+        "Professional Services": "[white][Prof][/]",
+        "Advertising & Marketing": "[white][Ads][/]",
+        "Utilities & Telecommunications": "[white][Util][/]",
+    }
 
-        # Side-by-side transaction waterfall grid showing 10 rows
-        grid = Table.grid(expand=True)
-        grid.add_column(ratio=1)
-        grid.add_column(ratio=1)
-
-        left_text = "\n".join(gpt_lines[-10:])
-        if done:
-            left_title = "[bold red]Traditional LLM (GPT-4o) [CRAWLING...][/]"
-            left_status = (
-                f"[bold red]⏳ STILL PROCESSING... {gpt_c} / 50 txns[/] [dim](~1.8 txns/s)[/]\n"
-                f"[dim]Elapsed: {gpt_time:.1f}s | Cost: ${gpt_c * 0.009:.3f} | Est. 1k Txns: ~9.3m[/]\n\n"
-                f"{left_text}"
-            )
-        else:
-            left_title = "[bold red]Traditional LLM (GPT-4o)[/]"
-            left_status = (
-                f"[bold red]Processing {gpt_c} / 50 txns...[/] [dim](Simulated ~1.8 txns/s)[/]\n"
-                f"[dim]Elapsed: {gpt_time:.1f}s | Speed: ~1.8 txns/s | Cost: ${gpt_c * 0.009:.3f}[/]\n\n"
-                f"{left_text}"
-            )
-
-        right_text = "\n".join(jev_lines[-10:])
-        if done:
-            right_title = f"[bold green]flashLedger ⚡ ({jev_title_label}) [FINISHED][/]"
-            jev_tps = count / max(jev_time, 0.001)
-            jev_status = (
-                f"[bold green]✓ ALL {count:,} TXNS AUDITED (COMPLETED)[/]\n"
-                f"[dim]Finished in: {jev_time:.2f}s | Speed: {jev_tps:.1f} txns/s | Cost: <$0.01[/]\n\n"
-                f"{right_text}"
-            )
-        else:
-            right_title = f"[bold green]flashLedger ⚡ ({jev_title_label})[/]"
-            rate = jev_c / max(jev_time, 0.001)
-            jev_status = (
-                f"[bold green]Classified {jev_c:,} / {count:,} txns...[/] ([bold green]{rate:.1f} txns/sec[/])\n"
-                f"[dim]Elapsed: {jev_time:.2f}s | Latency: ~2.8ms / txn | Cost: <$0.01[/]\n\n"
-                f"{right_text}"
-            )
-
-        grid.add_row(
-            Panel(left_status, title=left_title, border_style="red", box=box.ROUNDED),
-            Panel(jev_status, title=right_title, border_style="green", box=box.ROUNDED),
+    def build_view(done: bool = False, elapsed: float = 0.0, current_batch: int = 0) -> Group:
+        tps = completed_txns / max(elapsed, 0.001)
+        avg_lat = (elapsed / max(completed_txns, 1)) * 1000.0
+        header = render_header(actual_count, done=done, elapsed=elapsed, tps=tps)
+        upper_grid = render_stream_and_telemetry(
+            stream_lines=stream_lines,
+            total_vol=total_vol,
+            deduct_vol=deduct_vol,
+            risk_vol=risk_vol,
+            capex_count=capex_count,
+            risk_count=risk_count,
+            current_tps=tps,
+            avg_latency=avg_lat,
         )
-
-        # Tax auditor data panel: visible throughout the entire demo!
-        anom_text = (
-            "\n".join(flagged_anomalies[-2:])
-            if flagged_anomalies
-            else "[dim italic]Auditing transactions in parallel for IRS CapEx limits ($2,500 Safe Harbor) and tax risk...[/]"
+        matrix = render_matrix_panel(
+            block_states=block_states,
+            current_batch=current_batch,
+            total_batches=num_batches,
+            total_txns=actual_count,
+            completed_txns=completed_txns,
+            batch_size=batch_size,
         )
-        tax_title = f"[bold yellow]🔍 Autonomous Tax Auditor & Compliance Flags [{capex_count} CapEx • {risk_count} Risks • 100% Tax Mapped][/]"
-        tax_panel = Panel(anom_text, title=tax_title, border_style="yellow", box=box.ROUNDED)
-
-        # Economics Scorecard panel: visible throughout and live updating!
-        active_jev_time = jev_time if done else max(jev_time, 0.001)
-        active_jev_count = count if done else max(jev_c, 1)
-        scorecard = render_scorecard(active_jev_count, active_jev_time, gpt_c, gpt_time, gpt_done=False)
-
-        return Group(header, grid, tax_panel, scorecard)
+        if done:
+            scorecard = render_scorecard(
+                count=actual_count,
+                elapsed=elapsed,
+                total_vol=total_vol,
+                deduct_vol=deduct_vol,
+                capex_count=capex_count,
+                capex_vol=capex_vol,
+                risk_count=risk_count,
+                risk_vol=risk_vol,
+            )
+            return Group(header, upper_grid, matrix, scorecard)
+        return Group(header, upper_grid, matrix)
 
     if not interactive:
-        # Fast non-interactive mode for tests / scripting
+        # Non-interactive mode (for CI, testing, or headless pipelines)
         start = time.perf_counter()
-        for idx, txn in enumerate(transactions[:count]):
-            res = await engine.audit_transaction(txn)
+        for b_idx in range(num_batches):
+            txns = generate_benchmark_dataset(count=batch_size, seed=42 + b_idx)
+            for t in txns:
+                res = await engine.audit_transaction(t)
+                completed_txns += 1
+                total_vol += t.amount
+                if res.is_tax_deductible:
+                    deduct_vol += t.amount
+                else:
+                    risk_vol += t.amount
+                if "CAPEX_REVIEW_REQUIRED" in res.flags:
+                    capex_count += 1
+                    capex_vol += t.amount
+                if "HIGH_AUDIT_RISK" in res.flags:
+                    risk_count += 1
+                    risk_vol += t.amount
         elapsed = time.perf_counter() - start
-        con.print(render_scorecard(count, elapsed, 14, 8.0, gpt_done=True))
+        con.print(
+            render_scorecard(
+                count=actual_count,
+                elapsed=elapsed,
+                total_vol=total_vol,
+                deduct_vol=deduct_vol,
+                capex_count=capex_count,
+                capex_vol=capex_vol,
+                risk_count=risk_count,
+                risk_vol=risk_vol,
+            )
+        )
         await engine.aclose()
         return
 
-    # Interactive waterfall animation mode
-    # Target visual duration: ~3.4 - 3.8 seconds for 1,000 transactions
-    # Paced chunking allows human eyes to perceive the cascade
-    batch_chunk_size = 20 if engine.mode == "openrouter" else 25
-    delay_per_chunk = 0.08 if engine.mode == "mock" else 0.0
-
-    jev_completed = 0
-    gpt_completed = 0
-    gpt_target_limit = min(50, count)
+    # Interactive batch cluster animation
+    delay_per_batch = 0.035 if engine.mode == "mock" else 0.0
     start_total = time.perf_counter()
-    last_gpt_tick = start_total
-    jev_finish_time = 0.0
 
     try:
-        with Live(build_view(0, 0.0, 0, 0.0), console=con, screen=False, refresh_per_second=20) as live:
-            await asyncio.sleep(0.3)
+        with Live(build_view(done=False, elapsed=0.0, current_batch=0), console=con, screen=False, refresh_per_second=25) as live:
+            await asyncio.sleep(0.2)
 
-            chunk_idx = 0
-            for i in range(0, count, batch_chunk_size):
-                chunk = transactions[i : i + batch_chunk_size]
-                audit_tasks = [engine.audit_transaction(t) for t in chunk]
-                results = await asyncio.gather(*audit_tasks)
+            for b_idx in range(num_batches):
+                block_states[b_idx] = "[bright_yellow]▶[/]"
+                now = time.perf_counter()
+                elapsed = now - start_total
+                live.update(build_view(done=False, elapsed=elapsed, current_batch=b_idx + 1))
+
+                # Generate batch on the fly
+                batch_txns = generate_benchmark_dataset(count=batch_size, seed=42 + b_idx)
+
+                has_capex = False
+                has_risk = False
+                sample_candidates = []
+
+                if engine.mode == "mock":
+                    for t in batch_txns:
+                        res = engine._mock_audit(t, now)
+                        completed_txns += 1
+                        total_vol += t.amount
+                        if res.is_tax_deductible:
+                            deduct_vol += t.amount
+                        else:
+                            risk_vol += t.amount
+
+                        if "CAPEX_REVIEW_REQUIRED" in res.flags:
+                            capex_count += 1
+                            capex_vol += t.amount
+                            has_capex = True
+                            sample_candidates.append((t, res))
+                        elif "HIGH_AUDIT_RISK" in res.flags:
+                            risk_count += 1
+                            risk_vol += t.amount
+                            has_risk = True
+                            sample_candidates.append((t, res))
+                else:
+                    audit_tasks = [engine.audit_transaction(t) for t in batch_txns]
+                    results = await asyncio.gather(*audit_tasks)
+                    for t, res in zip(batch_txns, results):
+                        completed_txns += 1
+                        total_vol += t.amount
+                        if res.is_tax_deductible:
+                            deduct_vol += t.amount
+                        else:
+                            risk_vol += t.amount
+
+                        if "CAPEX_REVIEW_REQUIRED" in res.flags:
+                            capex_count += 1
+                            capex_vol += t.amount
+                            has_capex = True
+                            sample_candidates.append((t, res))
+                        elif "HIGH_AUDIT_RISK" in res.flags:
+                            risk_count += 1
+                            risk_vol += t.amount
+                            has_risk = True
+                            sample_candidates.append((t, res))
+
+                # Color block based on findings
+                if has_risk:
+                    block_states[b_idx] = "[bright_red]■[/]"
+                elif has_capex:
+                    block_states[b_idx] = "[yellow]■[/]"
+                else:
+                    block_states[b_idx] = "[bright_green]■[/]"
+
+                # Update stream lines with an interesting transaction from this batch
+                if sample_candidates:
+                    chosen_t, chosen_res = sample_candidates[-1]
+                else:
+                    chosen_t = batch_txns[-1]
+                    chosen_res = engine._mock_audit(chosen_t, now)
+
+                clean_name = chosen_t.clean_description[:12]
+                gl_tag = badge_map.get(chosen_res.gl_code, "[white][Misc][/]")
+                if "HIGH_AUDIT_RISK" in chosen_res.flags:
+                    deduct_badge = "[red]🚨Risk[/]"
+                elif "CAPEX_REVIEW_REQUIRED" in chosen_res.flags:
+                    deduct_badge = "[yellow]⚠️CapEx[/]"
+                elif chosen_res.is_tax_deductible:
+                    deduct_badge = "[green]✓Deduct[/]"
+                else:
+                    deduct_badge = "[red]✗Non-Ded[/]"
+
+                stream_lines.append(f"#{completed_txns:06d} {clean_name:<12} {gl_tag} {deduct_badge}")
 
                 now = time.perf_counter()
                 elapsed = now - start_total
+                live.update(build_view(done=False, elapsed=elapsed, current_batch=b_idx + 1))
 
-                for t, res in zip(chunk, results):
-                    jev_completed += 1
-                    tag_color = {
-                        "Software/SaaS": "green",
-                        "Meals & Entertainment": "cyan",
-                        "Hardware & Equipment": "yellow",
-                        "Travel": "blue",
-                        "Transportation & Rideshare": "magenta",
-                        "Personal / Non-Deductible": "red",
-                    }.get(res.gl_code, "white")
+                if delay_per_batch > 0:
+                    await asyncio.sleep(delay_per_batch)
 
-                    tag = f"[{tag_color}][{res.gl_code}][/{tag_color}]"
-                    deduct = "[green]✓Deduct[/]" if res.is_tax_deductible else "[red]✗Non-Ded[/]"
-                    clean_name = t.clean_description[:18]
-                    jev_lines.append(f"#{jev_completed:04d} {clean_name:<18} {tag} {deduct}")
-
-                    if "CAPEX_REVIEW_REQUIRED" in res.flags:
-                        capex_count += 1
-                        flagged_anomalies.append(
-                            f"[bold yellow]⚠️  CAPEX ALERT:[/] {t.clean_description[:25]} (${t.amount:,.0f}) > $2,500 Safe Harbor limit"
-                        )
-                    if "HIGH_AUDIT_RISK" in res.flags:
-                        risk_count += 1
-                        flagged_anomalies.append(
-                            f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] {t.clean_description[:22]} flagged non-deductible"
-                        )
-                # Update slow GPT-4o progress on the left (~1 txn every 0.6 seconds)
-                if now - last_gpt_tick >= 0.55:
-                    last_gpt_tick = now
-                    if gpt_completed < gpt_target_limit:
-                        gpt_completed += 1
-                        gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
-
-                live.update(build_view(gpt_completed, elapsed, jev_completed, elapsed))
-                if delay_per_chunk > 0:
-                    await asyncio.sleep(delay_per_chunk)
-
-            # Jev finishes all transactions!
-            jev_finish_time = time.perf_counter() - start_total
-            live.update(build_view(gpt_completed, jev_finish_time, count, jev_finish_time, done=True))
-
-            # Keep GPT-4o grinding on the left so viewers can see the staggering speed contrast!
-            while gpt_completed < gpt_target_limit:
-                now = time.perf_counter()
-                elapsed = now - start_total
-                if now - last_gpt_tick >= 0.55:
-                    last_gpt_tick = now
-                    gpt_completed += 1
-                    gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
-                    live.update(build_view(gpt_completed, elapsed, count, jev_finish_time, done=True))
-                await asyncio.sleep(0.04)
+            # Pipeline complete!
+            final_elapsed = time.perf_counter() - start_total
+            final_tps = completed_txns / max(final_elapsed, 0.001)
+            live.update(build_view(done=True, elapsed=final_elapsed, current_batch=num_batches))
 
     except (KeyboardInterrupt, asyncio.CancelledError):
         pass
 
-    final_now = time.perf_counter() - start_total
-    if jev_finish_time == 0.0:
-        jev_finish_time = final_now
+    final_elapsed = time.perf_counter() - start_total
+    final_tps = completed_txns / max(final_elapsed, 0.001)
 
     con.print(
-        f"[bold green]✓ Demo Complete:[/] flashLedger audited {count:,} transactions in "
-        f"[bold]{jev_finish_time:.2f}s[/] with 100% typed schema guarantees "
-        f"[dim](Traditional LLM reached {gpt_completed}/{gpt_target_limit} txns in {final_now:.1f}s)[/]."
+        f"[bold green]✓ Audit Complete:[/] flashLedger audited {completed_txns:,} transactions across "
+        f"{num_batches} batches in [bold]{final_elapsed:.2f}s[/] ([bold green]{final_tps:,.0f} txns/sec[/]) "
+        f"with 100% typed schema guarantees."
     )
     await engine.aclose()

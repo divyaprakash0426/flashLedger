@@ -42,4 +42,4 @@ def test_cli_classify_file(tmp_path):
 def test_cli_demo_headless():
     result = runner.invoke(app, ["demo", "--headless", "--count", "20"])
     assert result.exit_code == 0
-    assert "Final Benchmark & Economics Scorecard" in result.stdout
+    assert "Economics Scorecard" in result.stdout

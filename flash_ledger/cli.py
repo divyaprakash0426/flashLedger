@@ -208,17 +208,15 @@ def benchmark_cmd(
 @app.command("demo")
 def demo_cmd(
     headless: bool = typer.Option(False, "--headless", help="Run in headless non-interactive mode for scripting"),
-    count: int = typer.Option(1000, "--count", "-n", help="Transaction count for waterfall cascade"),
-    api: bool = typer.Option(False, "--api", help="Force live API mode (via OPENROUTER_API_KEY or TYPESAFE_API_KEY)"),
-    provider: str = typer.Option("auto", "--provider", "-p", help="Provider: 'auto', 'openrouter', 'typesafe', or 'mock'"),
+    count: int = typer.Option(100_000, "--count", "-n", help="Transaction count for batch cluster demo (default 100,000)"),
+    api: bool = typer.Option(False, "--api", help="Connect to live API (OpenRouter or TypeSafe) instead of mock"),
+    provider: str = typer.Option("mock", "--provider", "-p", help="Provider: 'mock', 'openrouter', 'typesafe', or 'auto'"),
 ):
-    """Launch the split-screen waterfall demo (GPT-4o vs Jev)."""
-    if provider != "auto":
-        mode = provider
-    elif api:
+    """Launch the enterprise batch cluster demo with GitHub-style matrix."""
+    if api:
         mode = "api"
     else:
-        mode = "auto"
+        mode = provider
     asyncio.run(run_split_screen_demo(console=console, interactive=not headless, count=count, mode=mode))
 
 
