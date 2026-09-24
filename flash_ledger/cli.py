@@ -209,9 +209,11 @@ def benchmark_cmd(
 def demo_cmd(
     headless: bool = typer.Option(False, "--headless", help="Run in headless non-interactive mode for scripting"),
     count: int = typer.Option(1000, "--count", "-n", help="Transaction count for waterfall cascade"),
+    api: bool = typer.Option(False, "--api", help="Connect to live TypeSafe Jev API (requires TYPESAFE_API_KEY)"),
 ):
     """Launch the split-screen waterfall demo (GPT-4o vs Jev)."""
-    asyncio.run(run_split_screen_demo(console=console, interactive=not headless, count=count))
+    mode = "api" if api else "auto"
+    asyncio.run(run_split_screen_demo(console=console, interactive=not headless, count=count, mode=mode))
 
 
 @app.command("download-dataset")

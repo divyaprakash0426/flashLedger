@@ -81,15 +81,16 @@ async def run_split_screen_demo(
     console: Console | None = None,
     interactive: bool = True,
     count: int = 1000,
+    mode: str = "auto",
 ) -> None:
     """Execute the live terminal animation demo comparing GPT-4o vs Jev."""
     con = console or Console()
 
     # Generate benchmark dataset
-    con.print("[dim]Pre-loading 1,000 real-world noisy bank feed transactions...[/]")
+    con.print(f"[dim]Pre-loading {count:,} real-world noisy bank feed transactions...[/]")
     transactions = generate_benchmark_dataset(count=count, seed=42)
 
-    engine = JevDecisionEngine(mode="mock")
+    engine = JevDecisionEngine(mode=mode)
     auditor = BatchAuditor(engine=engine, max_concurrency=50)
 
     layout = Layout()
@@ -106,11 +107,13 @@ async def run_split_screen_demo(
     layout["header"].update(render_header())
 
     gpt_lines: list[str] = [
-        "[red]Connecting to api.openai.com/v1/chat/completions...[/]",
+        "[red]Connecting to api.openai.com/v1/chat/completions (Simulated Baseline)...[/]",
         "[dim]Model: gpt-4o (temperature=0.0, json_object)[/]",
     ]
+    
+    engine_desc = "Live TypeSafe API" if engine.mode == "api" else "Local Deterministic Decision Engine"
     jev_lines: list[str] = [
-        "[green]Connecting to TypeSafe Jev Decision Engine...[/]",
+        f"[green]Connecting to TypeSafe Jev ({engine_desc})...[/]",
         "[dim]Model: jev-latest (System One parallel primitives)[/]",
     ]
 
