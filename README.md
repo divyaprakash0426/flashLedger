@@ -12,7 +12,15 @@
 
 ## 📺 Showcase
 
-![flashLedger Showcase](assets/showcase/demo.gif)
+### 1. Enterprise Batch Cluster Demo (100,000 Transactions)
+Watch flashLedger simulate a real-time corporate finance department auditing 100,000 noisy card transactions with live batch telemetry and a GitHub commit-style processing matrix:
+
+![flashLedger 100k Enterprise Showcase](assets/showcase/enterprise_100k.gif)
+
+### 2. Live Bank Statement Audit (Vercel AI Gateway & TypeSafe Jev)
+Auditing authentic banking and card feed datasets with real-time IRS risk scoring and tax write-off classification:
+
+![flashLedger Live Audit](assets/showcase/live_audit.gif)
 
 ---
 
