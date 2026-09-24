@@ -139,17 +139,18 @@ flash-ledger audit data/benchmark_sample_1000.csv
 flash-ledger benchmark --count 1000 --concurrency 50
 ```
 
-### Launch Split-Screen Benchmark Demo
-Watch a live split-screen comparison of traditional LLMs vs `flashLedger` (Jev):
+### Launch Enterprise Batch Cluster Demo
+Watch `flashLedger` audit 100,000 transactions across 100 parallel batches with an animated GitHub commit-style cluster matrix and real-time financial telemetry:
+
 ```bash
-# Auto-detects OPENROUTER_API_KEY or TYPESAFE_API_KEY (falls back to mock if unset)
+# Default: 100,000 transactions (zero API cost, 100-batch cluster matrix)
 flash-ledger demo
 
-# Force OpenRouter mode explicitly (e.g. 50 transactions for a quick live demo)
-flash-ledger demo --provider openrouter -n 50
+# Custom transaction volume (e.g., 5,000, 10,000, or 50,000 transactions):
+flash-ledger demo -n 10000
 
-# Force offline mock simulation
-flash-ledger demo --provider mock
+# Run live against OpenRouter Jev ('typesafe/jev-1.13'):
+flash-ledger demo --provider openrouter -n 50
 ```
 
 ---
@@ -240,7 +241,7 @@ flash-ledger classify statement.csv --coa path/to/coa.json
 uv run pytest -v
 ```
 
-All 30 unit and integration tests run in under 1 second without incurring API fees.
+All 32 unit and integration tests run in under 2 seconds without incurring API fees.
 
 ---
 
