@@ -139,7 +139,7 @@ async def run_split_screen_demo(
             f"{right_text}"
         )
         layout["right"].update(
-            Panel(right_status, title="[bold green]flashLedger ⚡ (TypeSafe Jev)[/]", border_style="green", box=box.ROUNDED)
+            Panel(jev_status, title="[bold green]flashLedger ⚡ (TypeSafe Jev)[/]", border_style="green", box=box.ROUNDED)
         )
 
         # Bottom panel: Anomalies

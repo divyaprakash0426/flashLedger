@@ -37,3 +37,9 @@ def test_cli_classify_file(tmp_path):
     result = runner.invoke(app, ["classify", str(csv_file), "--output", str(out_file), "--format", "qbo"])
     assert result.exit_code == 0
     assert out_file.exists()
+
+
+def test_cli_demo_headless():
+    result = runner.invoke(app, ["demo", "--headless", "--count", "20"])
+    assert result.exit_code == 0
+    assert "Final Benchmark & Economics Scorecard" in result.stdout
