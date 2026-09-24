@@ -268,5 +268,3 @@ All 32 unit and integration tests run in under 2 seconds without incurring API f
 ## 📜 License
 
 Licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE) for details.
-
-Copyright 2026 Divyaprakash (`divyaprakash0426`).
