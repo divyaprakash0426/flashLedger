@@ -60,6 +60,7 @@ def classify_cmd(
     capex_threshold: float = typer.Option(2500.0, "--capex-threshold", help="IRS CapEx safe harbor limit ($)"),
     api: bool = typer.Option(False, "--api", help="Force live API calls instead of mock"),
     provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Provider: vercel, openrouter, typesafe, mock"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-n", help="Limit number of transactions to classify"),
 ):
     """Ingest raw bank statement CSV and export classified GL accounts and tax flags."""
     if not file_path.exists():
@@ -72,13 +73,27 @@ def classify_cmd(
 
     console.print(f"[dim]Parsing {file_path}...[/]")
     transactions = parse_statement_csv(file_path)
+    if limit is not None and limit > 0:
+        transactions = transactions[:limit]
     console.print(f"[green]✓[/] Loaded [bold]{len(transactions)}[/] transactions.")
 
     engine = JevDecisionEngine(coa=chart, mode=mode)
     auditor = BatchAuditor(engine=engine, max_concurrency=concurrency)
 
-    console.print(f"[cyan]Auditing with TypeSafe Jev (concurrency={concurrency}, provider={engine.mode})...[/]")
-    results, summary = asyncio.run(auditor.audit_batch(transactions))
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn, TimeElapsedColumn
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold cyan]{task.description}[/]"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("•"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"Classifying with TypeSafe Jev ({engine.mode})...", total=len(transactions))
+        def on_prog(completed, total, _):
+            progress.update(task, completed=completed)
+        results, summary = asyncio.run(auditor.audit_batch(transactions, progress_callback=on_prog))
 
     console.print(
         f"[bold green]✓ Audit Completed:[/] {summary.total_transactions} txns in "
@@ -111,14 +126,31 @@ def audit_cmd(
     file_path: Path = typer.Argument(..., help="Path to input bank statement CSV"),
     coa: Optional[Path] = typer.Option(None, "--coa", help="Path to custom coa.json file"),
     provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Provider: vercel, openrouter, typesafe, mock"),
+    limit: Optional[int] = typer.Option(None, "--limit", "-n", help="Limit number of transactions to audit"),
 ):
     """Run compliance audit and display real-time interactive risk tables and flags."""
     chart = ChartOfAccounts.load(coa) if coa else ChartOfAccounts.load_default()
     transactions = parse_statement_csv(file_path)
+    if limit is not None and limit > 0:
+        transactions = transactions[:limit]
 
     engine = JevDecisionEngine(coa=chart, mode=provider or "auto")
     auditor = BatchAuditor(engine=engine)
-    results, summary = asyncio.run(auditor.audit_batch(transactions))
+
+    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn, TimeElapsedColumn
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold cyan]{task.description}[/]"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("•"),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task(f"Auditing with TypeSafe Jev ({engine.mode})...", total=len(transactions))
+        def on_prog(completed, total, _):
+            progress.update(task, completed=completed)
+        results, summary = asyncio.run(auditor.audit_batch(transactions, progress_callback=on_prog))
 
     table = Table(
         title="[bold cyan]⚡ flashLedger Compliance & Tax Audit Report[/]",
@@ -209,17 +241,26 @@ def benchmark_cmd(
 
 @app.command("demo")
 def demo_cmd(
+    file_path: Optional[Path] = typer.Option(None, "--file", "-f", help="Path to input statement CSV (e.g. data/mitulshah_sample.csv)"),
     headless: bool = typer.Option(False, "--headless", help="Run in headless non-interactive mode for scripting"),
     count: int = typer.Option(100_000, "--count", "-n", help="Transaction count for batch cluster demo (default 100,000)"),
-    api: bool = typer.Option(False, "--api", help="Connect to live API (OpenRouter or TypeSafe) instead of mock"),
-    provider: str = typer.Option("mock", "--provider", "-p", help="Provider: 'mock', 'openrouter', 'typesafe', or 'auto'"),
+    api: bool = typer.Option(False, "--api", help="Connect to live API (OpenRouter, Vercel, or TypeSafe) instead of mock"),
+    provider: str = typer.Option("mock", "--provider", "-p", help="Provider: 'mock', 'vercel', 'openrouter', 'typesafe', or 'auto'"),
 ):
     """Launch the enterprise batch cluster demo with GitHub-style matrix."""
     if api:
         mode = "api"
     else:
         mode = provider
-    asyncio.run(run_split_screen_demo(console=console, interactive=not headless, count=count, mode=mode))
+    asyncio.run(
+        run_split_screen_demo(
+            console=console,
+            interactive=not headless,
+            count=count,
+            mode=mode,
+            file_path=file_path,
+        )
+    )
 
 
 @app.command("download-dataset")

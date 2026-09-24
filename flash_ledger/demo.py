@@ -3,6 +3,8 @@
 from __future__ import annotations
 import asyncio
 import time
+from pathlib import Path
+from typing import Optional
 from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
@@ -10,6 +12,7 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 from flash_ledger.datasets.synthetic import generate_benchmark_dataset
+from flash_ledger.preprocessor import parse_statement_csv
 from flash_ledger.engine import JevDecisionEngine
 
 
@@ -86,9 +89,11 @@ def render_matrix_panel(
 ) -> Panel:
     """Render GitHub commit-style batch cluster grid."""
     rows = []
-    cols_per_row = max(1, total_batches // 4)
+    cols_per_row = max(1, (total_batches + 3) // 4)
     for r in range(4):
-        rows.append(" ".join(block_states[r * cols_per_row : (r + 1) * cols_per_row]))
+        chunk = block_states[r * cols_per_row : (r + 1) * cols_per_row]
+        if chunk:
+            rows.append(" ".join(chunk))
 
     matrix_text = "\n".join(rows)
     pct = (completed_txns / max(total_txns, 1)) * 100
@@ -172,14 +177,38 @@ async def run_split_screen_demo(
     interactive: bool = True,
     count: int = 100_000,
     mode: str = "mock",
+    file_path: Optional[str | Path] = None,
 ) -> None:
     """Execute high-speed batch cluster animation demo."""
     con = console or Console()
 
     engine = JevDecisionEngine(mode=mode)
-    num_batches = 100 if count >= 100 else count
-    batch_size = max(1, count // num_batches)
-    actual_count = batch_size * num_batches
+    if file_path:
+        all_txns = parse_statement_csv(file_path)
+        if count != 100_000:
+            target_count = min(count, len(all_txns))
+        else:
+            target_count = min(len(all_txns), 40 if mode != "mock" else 100)
+
+        all_txns = all_txns[:target_count]
+        actual_count = len(all_txns)
+        if actual_count <= 40:
+            num_batches = actual_count
+        elif actual_count <= 100:
+            num_batches = max(4, (actual_count // 4) * 4)
+        else:
+            num_batches = 100
+
+        batch_size = max(1, actual_count // num_batches)
+        batches_list = []
+        for i in range(0, actual_count, batch_size):
+            batches_list.append(all_txns[i : i + batch_size])
+        num_batches = len(batches_list)
+    else:
+        num_batches = 100 if count >= 100 else count
+        batch_size = max(1, count // num_batches)
+        actual_count = batch_size * num_batches
+        batches_list = None
 
     block_states = ["[dim]⬝[/]"] * num_batches
     stream_lines: list[str] = []
@@ -246,7 +275,7 @@ async def run_split_screen_demo(
         # Non-interactive mode (for CI, testing, or headless pipelines)
         start = time.perf_counter()
         for b_idx in range(num_batches):
-            txns = generate_benchmark_dataset(count=batch_size, seed=42 + b_idx)
+            txns = batches_list[b_idx] if batches_list is not None else generate_benchmark_dataset(count=batch_size, seed=42 + b_idx)
             for t in txns:
                 res = await engine.audit_transaction(t)
                 completed_txns += 1
@@ -291,8 +320,8 @@ async def run_split_screen_demo(
                 elapsed = now - start_total
                 live.update(build_view(done=False, elapsed=elapsed, current_batch=b_idx + 1))
 
-                # Generate batch on the fly
-                batch_txns = generate_benchmark_dataset(count=batch_size, seed=42 + b_idx)
+                # Generate batch on the fly or fetch from real dataset
+                batch_txns = batches_list[b_idx] if batches_list is not None else generate_benchmark_dataset(count=batch_size, seed=42 + b_idx)
 
                 has_capex = False
                 has_risk = False
@@ -353,7 +382,7 @@ async def run_split_screen_demo(
                     chosen_t, chosen_res = sample_candidates[-1]
                 else:
                     chosen_t = batch_txns[-1]
-                    chosen_res = engine._mock_audit(chosen_t, now)
+                    chosen_res = engine._mock_audit(chosen_t, now) if engine.mode == "mock" else results[-1]
 
                 clean_name = chosen_t.clean_description[:12]
                 gl_tag = badge_map.get(chosen_res.gl_code, "[white][Misc][/]")
