@@ -10,6 +10,12 @@
 
 ---
 
+## 📺 Showcase
+
+![flashLedger Showcase](assets/showcase/demo.gif)
+
+---
+
 ## 🚀 The Relatable Pain
 
 Every business owner, CFO, and CPA dreads monthly bookkeeping. Raw bank and corporate card strings are notoriously cryptic:
@@ -97,15 +103,21 @@ uv pip install -e ".[dev]"
 
 `flashLedger` includes an intelligent, deterministic local semantic mock engine for **100% offline, zero-cost testing and demos**.
 
-To connect to live Jev decision models, configure either OpenRouter or TypeSafe:
+To connect to live Jev decision models, configure your preferred provider:
 
-**Option A: OpenRouter (Recommended)**
+**Option A: Vercel AI Gateway (Free Jev until Sep 15)**
+```bash
+# Uses typesafe-ai/jev via https://ai-gateway.vercel.sh/typesafe/v1/systemone
+export VERCEL_AI_GATEWAY_API_KEY="your-vercel-key"
+```
+
+**Option B: OpenRouter**
 ```bash
 # Uses model 'typesafe/jev-1.13' via the /api/alpha/decisions endpoint
 export OPENROUTER_API_KEY="your-openrouter-api-key"
 ```
 
-**Option B: Direct TypeSafe API**
+**Option C: Direct TypeSafe API**
 ```bash
 # Uses official TypeSafe SDK via https://api.typesafe.ai
 export TYPESAFE_API_KEY="your-typesafe-api-key"

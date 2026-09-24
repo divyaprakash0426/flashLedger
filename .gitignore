@@ -46,6 +46,12 @@ coverage.xml
 .env.*
 !.env.example
 
+# Video recordings (only GIF assets committed for docs)
+*.mp4
+*.mov
+*.webm
+*.mkv
+
 # IDEs
 .idea/
 .vscode/

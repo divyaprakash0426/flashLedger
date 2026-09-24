@@ -109,3 +109,39 @@ async def test_openrouter_audit_mocked():
         assert result.expense_type == "OpEx"
         assert result.audit_risk_score == 0.10
         await engine.aclose()
+
+
+@pytest.mark.asyncio
+async def test_vercel_audit_mocked():
+    import respx
+
+    mock_resp = {
+        "model": "typesafe-ai/jev",
+        "answers": {
+            "gl_code": {"type": "choice", "choice": "Software/SaaS", "confidence": 1.0},
+            "tax_deductible": {"type": "noul", "noul": 0.95},
+            "expense_type": {"type": "choice", "choice": "OpEx", "confidence": 1.0},
+            "audit_risk": {"type": "score", "score": 0.05, "confidence": 0.95},
+        },
+    }
+
+    async with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.post("https://ai-gateway.vercel.sh/typesafe/v1/systemone").respond(
+            status_code=200,
+            json=mock_resp,
+        )
+
+        engine = JevDecisionEngine(api_key="vck_test_key_12345", mode="vercel")
+        txn = Transaction(
+            id="txn_vercel_test",
+            date=datetime.date(2026, 3, 24),
+            raw_description="AWS CLOUD SERVICES",
+            clean_description="AWS Cloud Services",
+            amount=85.00,
+        )
+        result = await engine.audit_transaction(txn)
+        assert result.gl_code == "Software/SaaS"
+        assert result.is_tax_deductible is True
+        assert result.expense_type == "OpEx"
+        assert result.audit_risk_score == 0.05
+        await engine.aclose()

@@ -58,7 +58,8 @@ def classify_cmd(
     coa: Optional[Path] = typer.Option(None, "--coa", help="Path to custom coa.json file"),
     concurrency: int = typer.Option(50, "--concurrency", "-c", help="Concurrent worker threads"),
     capex_threshold: float = typer.Option(2500.0, "--capex-threshold", help="IRS CapEx safe harbor limit ($)"),
-    api: bool = typer.Option(False, "--api", help="Force live API calls (OpenRouter or TypeSafe) instead of mock"),
+    api: bool = typer.Option(False, "--api", help="Force live API calls instead of mock"),
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Provider: vercel, openrouter, typesafe, mock"),
 ):
     """Ingest raw bank statement CSV and export classified GL accounts and tax flags."""
     if not file_path.exists():
@@ -67,7 +68,7 @@ def classify_cmd(
 
     chart = ChartOfAccounts.load(coa) if coa else ChartOfAccounts.load_default()
     chart.capex_threshold = capex_threshold
-    mode = "api" if api else "auto"
+    mode = provider if provider else ("api" if api else "auto")
 
     console.print(f"[dim]Parsing {file_path}...[/]")
     transactions = parse_statement_csv(file_path)
@@ -109,12 +110,13 @@ def classify_cmd(
 def audit_cmd(
     file_path: Path = typer.Argument(..., help="Path to input bank statement CSV"),
     coa: Optional[Path] = typer.Option(None, "--coa", help="Path to custom coa.json file"),
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Provider: vercel, openrouter, typesafe, mock"),
 ):
     """Run compliance audit and display real-time interactive risk tables and flags."""
     chart = ChartOfAccounts.load(coa) if coa else ChartOfAccounts.load_default()
     transactions = parse_statement_csv(file_path)
 
-    engine = JevDecisionEngine(coa=chart, mode="auto")
+    engine = JevDecisionEngine(coa=chart, mode=provider or "auto")
     auditor = BatchAuditor(engine=engine)
     results, summary = asyncio.run(auditor.audit_batch(transactions))
 
