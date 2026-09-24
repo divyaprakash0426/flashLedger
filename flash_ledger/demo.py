@@ -203,6 +203,7 @@ async def run_split_screen_demo(
 
     jev_completed = 0
     gpt_completed = 0
+    gpt_target_limit = min(50, count)
     start_total = time.perf_counter()
     last_gpt_tick = start_total
     jev_finish_time = 0.0
@@ -246,33 +247,31 @@ async def run_split_screen_demo(
                         flagged_anomalies.append(
                             f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] {t.clean_description[:22]} flagged non-deductible"
                         )
+                # Update slow GPT-4o progress on the left (~1 txn every 0.6 seconds)
+                if now - last_gpt_tick >= 0.55:
+                    last_gpt_tick = now
+                    if gpt_completed < gpt_target_limit:
+                        gpt_completed += 1
+                        gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
 
-            gpt_target_limit = min(50, count)
-            # Update slow GPT-4o progress on the left (~1 txn every 0.6 seconds)
-            if now - last_gpt_tick >= 0.55:
-                last_gpt_tick = now
-                if gpt_completed < gpt_target_limit:
+                live.update(build_view(gpt_completed, elapsed, jev_completed, elapsed))
+                if delay_per_chunk > 0:
+                    await asyncio.sleep(delay_per_chunk)
+
+            # Jev finishes all transactions!
+            jev_finish_time = time.perf_counter() - start_total
+            live.update(build_view(gpt_completed, jev_finish_time, count, jev_finish_time, done=True))
+
+            # Keep GPT-4o grinding on the left so viewers can see the staggering speed contrast!
+            while gpt_completed < gpt_target_limit:
+                now = time.perf_counter()
+                elapsed = now - start_total
+                if now - last_gpt_tick >= 0.55:
+                    last_gpt_tick = now
                     gpt_completed += 1
                     gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
-
-            live.update(build_view(gpt_completed, elapsed, jev_completed, elapsed))
-            if delay_per_chunk > 0:
-                await asyncio.sleep(delay_per_chunk)
-
-        # Jev finishes all transactions!
-        jev_finish_time = time.perf_counter() - start_total
-        live.update(build_view(gpt_completed, jev_finish_time, count, jev_finish_time, done=True))
-
-        # Keep GPT-4o grinding on the left so viewers can see the staggering speed contrast!
-        while gpt_completed < gpt_target_limit:
-            now = time.perf_counter()
-            elapsed = now - start_total
-            if now - last_gpt_tick >= 0.55:
-                last_gpt_tick = now
-                gpt_completed += 1
-                gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
-                live.update(build_view(gpt_completed, elapsed, count, jev_finish_time, done=True))
-            await asyncio.sleep(0.04)
+                    live.update(build_view(gpt_completed, elapsed, count, jev_finish_time, done=True))
+                await asyncio.sleep(0.04)
 
     except (KeyboardInterrupt, asyncio.CancelledError):
         pass
