@@ -27,9 +27,18 @@ def render_scorecard(
     jev_elapsed: float,
     gpt_count: int,
     gpt_elapsed: float,
+    gpt_done: bool = False,
 ) -> Table:
+    jev_tps = jev_count / max(jev_elapsed, 0.001)
+    gpt_tps = 1.8  # Standard frontier LLM JSON-mode throughput (~550ms/txn)
+    speedup = jev_tps / gpt_tps
+
+    title_status = "Final" if gpt_done else "Live"
+    sub = "" if gpt_done else " [dim](GPT-4o In-Progress)[/]"
+    title = f"[bold yellow]🏆 {title_status} Benchmark & Economics Scorecard[/]{sub}"
+
     table = Table(
-        title="[bold yellow]🏆 Final Benchmark & Economics Scorecard[/]",
+        title=title,
         box=box.ROUNDED,
         header_style="bold magenta",
         expand=True,
@@ -40,9 +49,9 @@ def render_scorecard(
     table.add_column("flashLedger ⚡ (Jev)", style="green", justify="center")
     table.add_column("The Jev Advantage", style="bold cyan", justify="center")
 
-    jev_tps = jev_count / max(jev_elapsed, 0.001)
-    gpt_tps = 1.8  # Standard frontier LLM JSON-mode throughput (~550ms/txn)
-    speedup = jev_tps / gpt_tps
+    gpt_prog = f"{gpt_count:,}/{jev_count:,} (DONE)" if gpt_done else f"[bold red]⏳ {gpt_count}/{jev_count:,}[/] [dim]({(gpt_count/jev_count)*100:.1f}%)[/]"
+    jev_prog = f"[bold green]✓ {jev_count:,}/{jev_count:,}[/] [dim](100%)[/]"
+    table.add_row("Audit Progress", gpt_prog, jev_prog, "[bold cyan]100% Completed[/]")
 
     table.add_row(
         "Throughput (Speed)",
@@ -50,29 +59,28 @@ def render_scorecard(
         f"[bold green]{jev_tps:.1f} txns/sec[/]",
         f"[bold]{speedup:.0f}x Faster[/]",
     )
+
+    gpt_time_str = f"~560s (9.3m)" if gpt_done else f"[red]{gpt_elapsed:.1f}s (Est. 9.3m)[/]"
     table.add_row(
         "Time (1,000 Txns)",
-        "~560s (9.3 min)",
+        gpt_time_str,
         f"[bold green]{jev_elapsed:.2f} seconds[/]",
         "Near Real-Time",
     )
+
+    gpt_cost_str = f"~$15 – $35" if gpt_done else f"[bold red]${gpt_count * 0.009:.3f}[/] [dim](Proj $35)[/]"
     table.add_row(
         "Cost (10,000 Txns)",
-        "~$15.00 – $35.00",
+        gpt_cost_str,
         "[bold green]<$0.01[/]",
         "[bold]>1,500x Cheaper[/]",
     )
+
     table.add_row(
         "Schema Guarantee",
         "JSON Schema Errors",
         "[bold green]100% Typed Strict[/]",
         "Zero Errors",
-    )
-    table.add_row(
-        "Audit Depth",
-        "GL Code text only",
-        "[bold green]GL+Tax+CapEx+Risk[/]",
-        "4-in-1 Parallel",
     )
     return table
 
@@ -173,7 +181,7 @@ async def run_split_screen_demo(
                     style="green",
                 )
             )
-            layout["bottom"].update(render_scorecard(count, jev_time, gpt_c, jev_time))
+            layout["bottom"].update(render_scorecard(count, jev_time, gpt_c, gpt_time, gpt_done=False))
         else:
             speedup = rate / 1.8 if rate > 0 else 0
             anom_text = (
@@ -198,7 +206,7 @@ async def run_split_screen_demo(
         for idx, txn in enumerate(transactions[:count]):
             res = await engine.audit_transaction(txn)
         elapsed = time.perf_counter() - start
-        con.print(render_scorecard(count, elapsed, 14, 8.0))
+        con.print(render_scorecard(count, elapsed, 14, 8.0, gpt_done=True))
         return
 
     # Interactive waterfall animation mode
