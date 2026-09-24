@@ -93,12 +93,21 @@ source .venv/bin/activate
 uv pip install -e ".[dev]"
 ```
 
-### 2. Configure TypeSafe API Key (Optional)
+### 2. Configure API Keys (Optional)
 
 `flashLedger` includes an intelligent, deterministic local semantic mock engine for **100% offline, zero-cost testing and demos**.
 
-To run against the live TypeSafe Jev API:
+To connect to live Jev decision models, configure either OpenRouter or TypeSafe:
+
+**Option A: OpenRouter (Recommended)**
 ```bash
+# Uses model 'typesafe/jev-1.13' via the /api/alpha/decisions endpoint
+export OPENROUTER_API_KEY="your-openrouter-api-key"
+```
+
+**Option B: Direct TypeSafe API**
+```bash
+# Uses official TypeSafe SDK via https://api.typesafe.ai
 export TYPESAFE_API_KEY="your-typesafe-api-key"
 ```
 
@@ -133,7 +142,14 @@ flash-ledger benchmark --count 1000 --concurrency 50
 ### Launch Split-Screen Benchmark Demo
 Watch a live split-screen comparison of traditional LLMs vs `flashLedger` (Jev):
 ```bash
+# Auto-detects OPENROUTER_API_KEY or TYPESAFE_API_KEY (falls back to mock if unset)
 flash-ledger demo
+
+# Force OpenRouter mode explicitly (e.g. 50 transactions for a quick live demo)
+flash-ledger demo --provider openrouter -n 50
+
+# Force offline mock simulation
+flash-ledger demo --provider mock
 ```
 
 ---

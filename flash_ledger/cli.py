@@ -58,7 +58,7 @@ def classify_cmd(
     coa: Optional[Path] = typer.Option(None, "--coa", help="Path to custom coa.json file"),
     concurrency: int = typer.Option(50, "--concurrency", "-c", help="Concurrent worker threads"),
     capex_threshold: float = typer.Option(2500.0, "--capex-threshold", help="IRS CapEx safe harbor limit ($)"),
-    api: bool = typer.Option(False, "--api", help="Force live TypeSafe API calls instead of auto/mock"),
+    api: bool = typer.Option(False, "--api", help="Force live API calls (OpenRouter or TypeSafe) instead of mock"),
 ):
     """Ingest raw bank statement CSV and export classified GL accounts and tax flags."""
     if not file_path.exists():
@@ -76,7 +76,7 @@ def classify_cmd(
     engine = JevDecisionEngine(coa=chart, mode=mode)
     auditor = BatchAuditor(engine=engine, max_concurrency=concurrency)
 
-    console.print(f"[cyan]Auditing with TypeSafe Jev (concurrency={concurrency}, mode={engine.mode})...[/]")
+    console.print(f"[cyan]Auditing with TypeSafe Jev (concurrency={concurrency}, provider={engine.mode})...[/]")
     results, summary = asyncio.run(auditor.audit_batch(transactions))
 
     console.print(
@@ -209,10 +209,16 @@ def benchmark_cmd(
 def demo_cmd(
     headless: bool = typer.Option(False, "--headless", help="Run in headless non-interactive mode for scripting"),
     count: int = typer.Option(1000, "--count", "-n", help="Transaction count for waterfall cascade"),
-    api: bool = typer.Option(False, "--api", help="Connect to live TypeSafe Jev API (requires TYPESAFE_API_KEY)"),
+    api: bool = typer.Option(False, "--api", help="Force live API mode (via OPENROUTER_API_KEY or TYPESAFE_API_KEY)"),
+    provider: str = typer.Option("auto", "--provider", "-p", help="Provider: 'auto', 'openrouter', 'typesafe', or 'mock'"),
 ):
     """Launch the split-screen waterfall demo (GPT-4o vs Jev)."""
-    mode = "api" if api else "auto"
+    if provider != "auto":
+        mode = provider
+    elif api:
+        mode = "api"
+    else:
+        mode = "auto"
     asyncio.run(run_split_screen_demo(console=console, interactive=not headless, count=count, mode=mode))
 
 

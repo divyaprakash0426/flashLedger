@@ -73,3 +73,39 @@ async def test_engine_question_building():
     assert "tax_deductible" in questions
     assert "expense_type" in questions
     assert "audit_risk" in questions
+
+
+@pytest.mark.asyncio
+async def test_openrouter_audit_mocked():
+    import respx
+
+    mock_resp = {
+        "model": "typesafe/jev-1.13-20260917",
+        "answers": {
+            "gl_code": {"type": "choice", "choice": "Software/SaaS", "confidence": 0.99},
+            "tax_deductible": {"type": "noul", "noul": 0.95},
+            "expense_type": {"type": "choice", "choice": "OpEx", "confidence": 0.98},
+            "audit_risk": {"type": "score", "score": 0.40, "confidence": 0.90},
+        },
+    }
+
+    async with respx.mock(assert_all_called=False) as respx_mock:
+        respx_mock.post("https://openrouter.ai/api/alpha/decisions").respond(
+            status_code=200,
+            json=mock_resp,
+        )
+
+        engine = JevDecisionEngine(mode="openrouter")
+        txn = Transaction(
+            id="txn_test",
+            date=datetime.date(2026, 3, 24),
+            raw_description="GITHUB *SPONSORS 877-448",
+            clean_description="GitHub Sponsors",
+            amount=50.00,
+        )
+        result = await engine.audit_transaction(txn)
+        assert result.gl_code == "Software/SaaS"
+        assert result.is_tax_deductible is True
+        assert result.expense_type == "OpEx"
+        assert result.audit_risk_score == 0.10
+        await engine.aclose()

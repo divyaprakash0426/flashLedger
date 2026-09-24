@@ -104,10 +104,19 @@ async def run_split_screen_demo(
         "[dim]Model: gpt-4o (temperature=0.0, response_format={'type': 'json_object'})[/]",
     ]
 
-    engine_desc = "Live TypeSafe API" if engine.mode == "api" else "Local Deterministic Decision Engine"
+    if engine.mode == "openrouter":
+        engine_desc = f"OpenRouter API ({engine.model})"
+        jev_title_label = "OpenRouter Jev"
+    elif engine.mode in ("api", "typesafe"):
+        engine_desc = "Live TypeSafe API"
+        jev_title_label = "TypeSafe Jev"
+    else:
+        engine_desc = "Local Deterministic Decision Engine"
+        jev_title_label = "TypeSafe Jev"
+
     jev_lines: list[str] = [
         f"[green]Connecting to TypeSafe Jev ({engine_desc})...[/]",
-        "[dim]Model: jev-latest (System One parallel primitives)[/]",
+        f"[dim]Model: {engine.model} (System One parallel primitives)[/]",
     ]
 
     flagged_anomalies: list[str] = []
@@ -149,7 +158,7 @@ async def run_split_screen_demo(
 
         right_text = "\n".join(jev_lines[-10:])
         if done:
-            right_title = "[bold green]flashLedger ⚡ (TypeSafe Jev) [FINISHED][/]"
+            right_title = f"[bold green]flashLedger ⚡ ({jev_title_label}) [FINISHED][/]"
             jev_tps = count / max(jev_time, 0.001)
             jev_status = (
                 f"[bold green]✓ ALL {count:,} TXNS AUDITED (COMPLETED)[/]\n"
@@ -157,7 +166,7 @@ async def run_split_screen_demo(
                 f"{right_text}"
             )
         else:
-            right_title = "[bold green]flashLedger ⚡ (TypeSafe Jev)[/]"
+            right_title = f"[bold green]flashLedger ⚡ ({jev_title_label})[/]"
             rate = jev_c / max(jev_time, 0.001)
             jev_status = (
                 f"[bold green]Classified {jev_c:,} / {count:,} txns...[/] ([bold green]{rate:.1f} txns/sec[/])\n"
@@ -193,13 +202,14 @@ async def run_split_screen_demo(
             res = await engine.audit_transaction(txn)
         elapsed = time.perf_counter() - start
         con.print(render_scorecard(count, elapsed, 14, 8.0, gpt_done=True))
+        await engine.aclose()
         return
 
     # Interactive waterfall animation mode
     # Target visual duration: ~3.4 - 3.8 seconds for 1,000 transactions
     # Paced chunking allows human eyes to perceive the cascade
-    batch_chunk_size = 25
-    delay_per_chunk = 0.08 if engine.mode == "mock" else 0.01
+    batch_chunk_size = 20 if engine.mode == "openrouter" else 25
+    delay_per_chunk = 0.08 if engine.mode == "mock" else 0.0
 
     jev_completed = 0
     gpt_completed = 0
@@ -285,3 +295,4 @@ async def run_split_screen_demo(
         f"[bold]{jev_finish_time:.2f}s[/] with 100% typed schema guarantees "
         f"[dim](Traditional LLM reached {gpt_completed}/{gpt_target_limit} txns in {final_now:.1f}s)[/]."
     )
+    await engine.aclose()

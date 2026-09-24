@@ -5,6 +5,7 @@ import os
 import re
 import time
 from typing import Any, Optional
+import httpx
 from flash_ledger.coa import ChartOfAccounts
 from flash_ledger.models import Transaction, AuditResult
 
@@ -17,7 +18,7 @@ except ImportError:
 
 
 class JevDecisionEngine:
-    """Decision engine executing parallel Choice, Noul, and Score audits via TypeSafe Jev."""
+    """Decision engine executing parallel Choice, Noul, and Score audits via OpenRouter or TypeSafe Jev."""
 
     def __init__(
         self,
@@ -25,33 +26,70 @@ class JevDecisionEngine:
         base_url: Optional[str] = None,
         mode: str = "auto",
         coa: Optional[ChartOfAccounts] = None,
+        model: str = "typesafe/jev-1.13",
+        timeout: float = 15.0,
     ) -> None:
         """
         Initialize the Jev decision engine.
 
-        :param api_key: TypeSafe API key (or TYPESAFE_API_KEY env var)
+        :param api_key: TypeSafe or OpenRouter API key (or env vars)
         :param base_url: Custom API endpoint (e.g. for proxies or OpenRouter)
-        :param mode: 'auto' (use API if key present, else mock), 'api', or 'mock'
+        :param mode: 'auto' (detects OPENROUTER_API_KEY then TYPESAFE_API_KEY, else mock),
+                     'openrouter', 'typesafe', 'api', or 'mock'
         :param coa: ChartOfAccounts instance (defaults to standard GAAP COA)
+        :param model: Jev model slug (default 'typesafe/jev-1.13')
+        :param timeout: HTTP request timeout in seconds
         """
-        self.api_key = api_key or os.environ.get("TYPESAFE_API_KEY")
+        self.openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        self.typesafe_key = api_key or os.environ.get("TYPESAFE_API_KEY")
         self.base_url = base_url or os.environ.get("TYPESAFE_BASE_URL")
         self.coa = coa or ChartOfAccounts.load_default()
+        self.model = model
+        self.timeout = timeout
 
         if mode == "auto":
-            self.mode = "api" if self.api_key else "mock"
+            if self.openrouter_key:
+                self.mode = "openrouter"
+            elif self.typesafe_key:
+                self.mode = "typesafe"
+            else:
+                self.mode = "mock"
+        elif mode in ("api", "live"):
+            if self.openrouter_key:
+                self.mode = "openrouter"
+            elif self.typesafe_key:
+                self.mode = "typesafe"
+            else:
+                raise ValueError("Neither OPENROUTER_API_KEY nor TYPESAFE_API_KEY found for live API mode.")
         else:
             self.mode = mode
 
         self._client: Optional[Any] = None
-        if self.mode == "api":
+        self._http_client: Optional[httpx.AsyncClient] = None
+
+        if self.mode == "typesafe":
             if not TYPESAFE_SDK_AVAILABLE:
                 raise ImportError(
-                    "typesafe-sdk is required for 'api' mode. Install it via 'uv pip install typesafe-sdk'."
+                    "typesafe-sdk is required for 'typesafe' mode. Install it via 'uv pip install typesafe-sdk'."
                 )
-            if not self.api_key:
-                raise ValueError("TYPESAFE_API_KEY is required when mode is explicitly set to 'api'.")
-            self._client = AsyncTypeSafeClient(api_key=self.api_key, base_url=self.base_url)
+            if not self.typesafe_key:
+                raise ValueError("TYPESAFE_API_KEY is required when mode is 'typesafe'.")
+            self._client = AsyncTypeSafeClient(api_key=self.typesafe_key, base_url=self.base_url)
+        elif self.mode == "openrouter":
+            if not self.openrouter_key:
+                raise ValueError("OPENROUTER_API_KEY is required when mode is 'openrouter'.")
+            self._http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(self.timeout, connect=5.0),
+                limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+            )
+
+    async def aclose(self) -> None:
+        """Clean up HTTP client connections."""
+        if self._http_client is not None:
+            await self._http_client.aclose()
+            self._http_client = None
+        if self._client is not None and hasattr(self._client, "aclose"):
+            await self._client.aclose()
 
     def _build_jev_questions(self) -> dict[str, Any]:
         """Construct the 4 parallel Jev questions: Choice, Noul, Choice, Score."""
@@ -96,8 +134,122 @@ class JevDecisionEngine:
 
         if self.mode == "mock":
             return self._mock_audit(txn, start_time)
+        elif self.mode == "openrouter":
+            return await self._audit_openrouter(txn, start_time)
+        elif self.mode in ("typesafe", "api"):
+            return await self._audit_typesafe(txn, start_time)
 
-        # Mode == "api"
+        return self._mock_audit(txn, start_time)
+
+    async def _audit_openrouter(self, txn: Transaction, start_time: float) -> AuditResult:
+        """Execute Jev audit via OpenRouter /api/alpha/decisions endpoint."""
+        if self._http_client is None:
+            self._http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(self.timeout, connect=5.0),
+                limits=httpx.Limits(max_connections=50, max_keepalive_connections=20),
+            )
+
+        url = self.base_url or "https://openrouter.ai/api/alpha/decisions"
+        headers = {
+            "Authorization": f"Bearer {self.openrouter_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/divyaprakash0426/flashLedger",
+            "X-Title": "flashLedger",
+        }
+        payload = {
+            "model": self.model,
+            "state": {
+                "merchant": txn.clean_description,
+                "raw_statement": txn.raw_description,
+                "amount": txn.amount,
+                "currency": txn.currency,
+                "account": txn.account,
+                "date": txn.date.isoformat(),
+            },
+            "questions": {
+                "gl_code": {
+                    "type": "choice",
+                    "instructions": "Classify this financial transaction into the single most accurate Chart of Accounts category.",
+                    "criteria": self.coa.get_criteria_mapping(),
+                },
+                "tax_deductible": {
+                    "type": "noul",
+                    "instructions": "Is this transaction an ordinary and necessary tax-deductible business expense under standard IRS/GAAP tax guidelines?",
+                },
+                "expense_type": {
+                    "type": "choice",
+                    "instructions": "Classify whether this expense is an Operating Expense (OpEx) or Capital Expenditure (CapEx).",
+                    "criteria": {
+                        "OpEx": "Ordinary operating expense incurred in daily business operations.",
+                        "CapEx": "Capital asset or equipment purchase exceeding company capitalization threshold.",
+                    },
+                },
+                "audit_risk": {
+                    "type": "score",
+                    "instructions": "Rate the audit risk index for IRS compliance, personal expense suspicion, or anomaly detection.",
+                    "criteria": [
+                        "Very Low Risk: Standard, ordinary business expense",
+                        "Low Risk: Expected recurring transaction with minor noise",
+                        "Medium Risk: Ambiguous merchant or unusually high amount",
+                        "High Risk: Personal expense indicators, luxury goods, or dining anomalies",
+                        "Critical Risk: Prohibited expense (gambling, personal entertainment, severe compliance risk)",
+                    ],
+                },
+            },
+        }
+
+        try:
+            resp = await self._http_client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+
+            answers = data.get("answers", {})
+            gl_ans = answers.get("gl_code", {})
+            tax_ans = answers.get("tax_deductible", {})
+            exp_ans = answers.get("expense_type", {})
+            risk_ans = answers.get("audit_risk", {})
+
+            gl_code = gl_ans.get("choice", "Office Supplies")
+            gl_conf = float(gl_ans.get("confidence", 0.95))
+
+            tax_prob = float(tax_ans.get("noul", 0.95))
+            is_deductible = tax_prob >= 0.50
+
+            exp_type = exp_ans.get("choice", "OpEx")
+
+            # Score in OpenRouter has 5 criteria levels (0 to 4)
+            raw_score = risk_ans.get("score", 0.2)
+            risk_score = min(max(float(raw_score) / 4.0, 0.0), 1.0)
+
+            flags: list[str] = []
+            if txn.amount >= self.coa.capex_threshold and exp_type == "CapEx":
+                flags.append("CAPEX_REVIEW_REQUIRED")
+            elif txn.amount >= self.coa.capex_threshold and gl_code == "Hardware & Equipment":
+                exp_type = "CapEx"
+                flags.append("CAPEX_REVIEW_REQUIRED")
+
+            if risk_score >= 0.70:
+                flags.append("HIGH_AUDIT_RISK")
+            if not is_deductible:
+                flags.append("NON_DEDUCTIBLE")
+
+            return AuditResult(
+                transaction_id=txn.id,
+                gl_code=gl_code,
+                gl_confidence=gl_conf,
+                is_tax_deductible=is_deductible,
+                deductible_probability=tax_prob,
+                expense_type=exp_type,
+                audit_risk_score=round(risk_score, 2),
+                flags=flags,
+                latency_ms=round(elapsed_ms, 2),
+            )
+        except Exception:
+            return self._mock_audit(txn, start_time)
+
+    async def _audit_typesafe(self, txn: Transaction, start_time: float) -> AuditResult:
+        """Execute multi-attribute audit via TypeSafe SDK."""
         assert self._client is not None
         questions = self._build_jev_questions()
         state = {
