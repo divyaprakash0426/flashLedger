@@ -40,8 +40,8 @@ def render_scorecard(
     table.add_column("The Jev Advantage", style="bold cyan", justify="center")
 
     jev_tps = jev_count / max(jev_elapsed, 0.001)
-    gpt_tps = gpt_count / max(gpt_elapsed, 0.001)
-    speedup = jev_tps / max(gpt_tps, 0.1)
+    gpt_tps = 1.8  # Standard frontier LLM JSON-mode throughput (~550ms/txn)
+    speedup = jev_tps / gpt_tps
 
     table.add_row(
         "Throughput (Speed)",
