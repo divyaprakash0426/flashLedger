@@ -16,8 +16,8 @@ from flash_ledger.engine import JevDecisionEngine
 
 def render_header() -> Panel:
     text = Text.from_markup(
-        "[bold cyan]⚡ flashLedger: Autonomous Financial Auditor Benchmark[/]\n"
-        "[dim]Frontier Generative LLM (GPT-4o) vs TypeSafe Jev (System One Parallel Primitives)[/]"
+        "[bold cyan]⚡ flashLedger: Autonomous Financial Auditor Benchmark[/] "
+        "[dim]| Frontier Generative LLM (GPT-4o) vs TypeSafe Jev[/]"
     )
     return Panel(text, style="blue", box=box.ROUNDED)
 
@@ -33,9 +33,10 @@ def render_scorecard(
         box=box.ROUNDED,
         header_style="bold magenta",
         expand=True,
+        padding=(0, 0),
     )
-    table.add_column("Metric", style="bold white", width=25)
-    table.add_column("Traditional LLM (GPT-4o)", style="red", justify="center")
+    table.add_column("Audit Metric", style="bold white", justify="left")
+    table.add_column("GPT-4o (Simulated)", style="red", justify="center")
     table.add_column("flashLedger ⚡ (Jev)", style="green", justify="center")
     table.add_column("The Jev Advantage", style="bold cyan", justify="center")
 
@@ -50,28 +51,28 @@ def render_scorecard(
         f"[bold]{speedup:.0f}x Faster[/]",
     )
     table.add_row(
-        "Time for 1,000 Txns",
-        "~560 seconds (9.3 min)",
+        "Time (1,000 Txns)",
+        "~560s (9.3 min)",
         f"[bold green]{jev_elapsed:.2f} seconds[/]",
         "Near Real-Time",
     )
     table.add_row(
-        "Cost per 10,000 Txns",
+        "Cost (10,000 Txns)",
         "~$15.00 – $35.00",
         "[bold green]<$0.01[/]",
         "[bold]>1,500x Cheaper[/]",
     )
     table.add_row(
         "Schema Guarantee",
-        "Prone to JSON formatting errors",
-        "[bold green]100% Typed Strict Enum[/]",
-        "Zero Hallucinations",
+        "JSON Schema Errors",
+        "[bold green]100% Typed Strict[/]",
+        "Zero Errors",
     )
     table.add_row(
-        "Audit Scope",
-        "GL Code only (text synthesis)",
-        "[bold green]GL + Deductible + CapEx + Risk[/]",
-        "4-in-1 Parallel Audit",
+        "Audit Depth",
+        "GL Code text only",
+        "[bold green]GL+Tax+CapEx+Risk[/]",
+        "4-in-1 Parallel",
     )
     return table
 
@@ -93,9 +94,9 @@ async def run_split_screen_demo(
 
     layout = Layout()
     layout.split_column(
-        Layout(name="header", size=4),
-        Layout(name="main", size=16),
-        Layout(name="anomalies", size=6),
+        Layout(name="header", size=3),
+        Layout(name="main", size=8),
+        Layout(name="bottom", size=11),
     )
     layout["main"].split_row(
         Layout(name="left", ratio=1),
@@ -116,10 +117,12 @@ async def run_split_screen_demo(
     ]
 
     flagged_anomalies: list[str] = []
+    capex_count = 0
+    risk_count = 0
 
     def update_views(gpt_c: int, gpt_time: float, jev_c: int, jev_time: float, done: bool = False):
         # Left panel: Traditional LLM
-        left_text = "\n".join(gpt_lines[-10:])
+        left_text = "\n".join(gpt_lines[-3:])
         left_status = (
             f"[bold red]Processing {gpt_c} / 50 txns...[/] [dim](Simulated ~1.8 txns/s)[/]\n"
             f"[dim]Elapsed: {gpt_time:.1f}s | Speed: ~1.8 txns/s | Cost: ${gpt_c * 0.009:.3f}[/]\n\n"
@@ -130,27 +133,38 @@ async def run_split_screen_demo(
         )
 
         # Right panel: flashLedger (Jev)
-        right_text = "\n".join(jev_lines[-10:])
+        right_text = "\n".join(jev_lines[-3:])
         rate = jev_c / max(jev_time, 0.001)
         status_tag = "[bold green]COMPLETED[/]" if done else f"[bold green]{rate:.1f} txns/sec[/]"
         jev_status = (
-            f"[bold green]Classified {jev_c} / {count} txns...[/] ({status_tag}) | [dim]Cost: <$0.01[/]\n"
-            f"[dim]Elapsed: {jev_time:.2f}s | Latency: ~2.8ms / txn[/]\n\n"
+            f"[bold green]Classified {jev_c:,} / {count:,} txns...[/] ({status_tag})\n"
+            f"[dim]Elapsed: {jev_time:.2f}s | Latency: ~2.8ms / txn | Cost: <$0.01[/]\n\n"
             f"{right_text}"
         )
         layout["right"].update(
             Panel(jev_status, title="[bold green]flashLedger ⚡ (TypeSafe Jev)[/]", border_style="green", box=box.ROUNDED)
         )
 
-        # Bottom panel: Anomalies
-        anom_text = (
-            "\n".join(flagged_anomalies[-2:])
-            if flagged_anomalies
-            else "[dim italic]Auditing transactions for IRS CapEx thresholds and compliance risk flags...[/]"
-        )
-        layout["anomalies"].update(
-            Panel(anom_text, title="[bold yellow]🔍 Real-Time Autonomous Audit Flags[/]", border_style="yellow", box=box.ROUNDED)
-        )
+        # Bottom panel: Live Anomalies during animation, or Scorecard when complete
+        if done:
+            layout["bottom"].update(render_scorecard(count, jev_time, gpt_c, jev_time))
+        else:
+            speedup = rate / 1.8 if rate > 0 else 0
+            anom_text = (
+                "\n".join(flagged_anomalies[-2:])
+                if flagged_anomalies
+                else "[dim italic]Auditing transactions in parallel for IRS CapEx thresholds ($2,500 Safe Harbor) and tax risk...[/]"
+            )
+            anom_content = (
+                f"[bold cyan]⚡ Real-Time Speedup:[/] [bold]{speedup:.0f}x Faster[/]  "
+                f"[dim]|[/]  [bold green]💰 Cost Savings:[/] [bold]>99.9% cheaper[/]  "
+                f"[dim]|[/]  [bold magenta]🔒 Guarantee:[/] [bold]100% Typed Strict Enum[/]\n\n"
+                f"{anom_text}\n\n"
+                f"[dim]Continuous parallel audit: {capex_count} CapEx reviews flagged, {risk_count} tax audit risks detected.[/]"
+            )
+            layout["bottom"].update(
+                Panel(anom_content, title="[bold yellow]🔍 Real-Time Autonomous Audit Flags & Live Telemetry[/]", border_style="yellow", box=box.ROUNDED)
+            )
 
     if not interactive:
         # Fast non-interactive mode for tests / scripting
@@ -197,15 +211,17 @@ async def run_split_screen_demo(
                 }.get(res.gl_code, "white")
 
                 tag = f"[{tag_color}][{res.gl_code}][/{tag_color}]"
-                deduct = "[green]✓Deductible[/]" if res.is_tax_deductible else "[red]✗Non-Deduct[/]"
-                clean_name = t.clean_description[:20]
-                jev_lines.append(f"#{jev_completed:04d} {clean_name:<20} {tag} {deduct}")
+                deduct = "[green]✓Deduct[/]" if res.is_tax_deductible else "[red]✗Non-Ded[/]"
+                clean_name = t.clean_description[:18]
+                jev_lines.append(f"#{jev_completed:04d} {clean_name:<18} {tag} {deduct}")
 
                 if "CAPEX_REVIEW_REQUIRED" in res.flags:
+                    capex_count += 1
                     flagged_anomalies.append(
                         f"[bold yellow]⚠️  CAPEX ALERT:[/] {t.clean_description} (${t.amount:,.2f}) exceeds $2,500 IRS Safe Harbor limit."
                     )
                 if "HIGH_AUDIT_RISK" in res.flags:
+                    risk_count += 1
                     flagged_anomalies.append(
                         f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] {t.clean_description} flagged as non-deductible."
                     )
@@ -223,12 +239,9 @@ async def run_split_screen_demo(
 
         total_elapsed = time.perf_counter() - start_total
         update_views(gpt_completed, total_elapsed, count, total_elapsed, done=True)
-        await asyncio.sleep(1.2)
+        await asyncio.sleep(1.0)
 
-    # Final summary display below the live animation
-    con.print("\n")
-    con.print(render_scorecard(count, total_elapsed, gpt_completed, total_elapsed))
     con.print(
-        f"\n[bold green]✓ Demo Complete:[/] {count:,} transactions audited in "
+        f"[bold green]✓ Demo Complete:[/] {count:,} transactions audited in "
         f"[bold]{total_elapsed:.2f}s[/] with 100% typed schema guarantees."
     )
