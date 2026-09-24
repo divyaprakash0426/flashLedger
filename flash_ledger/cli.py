@@ -210,7 +210,7 @@ def demo_cmd(
     headless: bool = typer.Option(False, "--headless", help="Run in headless non-interactive mode for scripting"),
     count: int = typer.Option(1000, "--count", "-n", help="Transaction count for waterfall cascade"),
 ):
-    """Launch the viral LinkedIn split-screen waterfall demo (GPT-4o vs Jev)."""
+    """Launch the split-screen waterfall demo (GPT-4o vs Jev)."""
     asyncio.run(run_split_screen_demo(console=console, interactive=not headless, count=count))
 
 

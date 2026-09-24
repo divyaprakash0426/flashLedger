@@ -1,4 +1,4 @@
-"""Viral LinkedIn split-screen benchmark demo: Traditional LLM (GPT-4o) vs flashLedger (Jev)."""
+"""Split-screen benchmark demo: Traditional LLM (GPT-4o) vs flashLedger (Jev)."""
 
 from __future__ import annotations
 import asyncio

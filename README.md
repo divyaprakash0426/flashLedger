@@ -130,7 +130,7 @@ flash-ledger audit data/benchmark_sample_1000.csv
 flash-ledger benchmark --count 1000 --concurrency 50
 ```
 
-### Launch Viral LinkedIn Split-Screen Demo
+### Launch Split-Screen Benchmark Demo
 Watch a live split-screen comparison of traditional LLMs vs `flashLedger` (Jev):
 ```bash
 flash-ledger demo
