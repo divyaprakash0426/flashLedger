@@ -3,8 +3,7 @@
 from __future__ import annotations
 import asyncio
 import time
-from rich.console import Console
-from rich.layout import Layout
+from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
@@ -100,20 +99,6 @@ async def run_split_screen_demo(
 
     engine = JevDecisionEngine(mode=mode)
 
-    layout = Layout()
-    layout.split_column(
-        Layout(name="header", size=3),
-        Layout(name="main", size=7),
-        Layout(name="tax", size=4),
-        Layout(name="scorecard", size=10),
-    )
-    layout["main"].split_row(
-        Layout(name="left", ratio=1),
-        Layout(name="right", ratio=1),
-    )
-
-    layout["header"].update(render_header())
-
     gpt_lines: list[str] = [
         "[red]Connecting to api.openai.com/v1/chat/completions (Simulated Baseline)...[/]",
         "[dim]Model: gpt-4o (temperature=0.0, response_format={'type': 'json_object'})[/]",
@@ -129,20 +114,24 @@ async def run_split_screen_demo(
     capex_count = 0
     risk_count = 0
 
-    def update_views(gpt_c: int, gpt_time: float, jev_c: int, jev_time: float, done: bool = False):
-        # Header update
+    def build_view(gpt_c: int, gpt_time: float, jev_c: int, jev_time: float, done: bool = False) -> Group:
+        # Header banner
         if done:
-            layout["header"].update(
-                Panel(
-                    f"[bold green]⚡ flashLedger: ALL {count:,} TXNS AUDITED IN {jev_time:.2f}s![/] "
-                    f"[dim]| Traditional LLM still crawling (~9.3 min for 1k txns) [Press Ctrl+C to stop][/]",
-                    box=box.ROUNDED,
-                    style="green",
-                )
+            header = Panel(
+                f"[bold green]⚡ flashLedger: ALL {count:,} TXNS AUDITED IN {jev_time:.2f}s![/] "
+                f"[dim]| Traditional LLM still crawling (~9.3 min for 1k txns) [Press Ctrl+C to stop][/]",
+                box=box.ROUNDED,
+                style="green",
             )
+        else:
+            header = render_header()
 
-        # Left panel: Traditional LLM
-        left_text = "\n".join(gpt_lines[-3:])
+        # Side-by-side transaction waterfall grid showing 10 rows
+        grid = Table.grid(expand=True)
+        grid.add_column(ratio=1)
+        grid.add_column(ratio=1)
+
+        left_text = "\n".join(gpt_lines[-10:])
         if done:
             left_title = "[bold red]Traditional LLM (GPT-4o) [CRAWLING...][/]"
             left_status = (
@@ -157,12 +146,8 @@ async def run_split_screen_demo(
                 f"[dim]Elapsed: {gpt_time:.1f}s | Speed: ~1.8 txns/s | Cost: ${gpt_c * 0.009:.3f}[/]\n\n"
                 f"{left_text}"
             )
-        layout["left"].update(
-            Panel(left_status, title=left_title, border_style="red", box=box.ROUNDED)
-        )
 
-        # Right panel: flashLedger (Jev)
-        right_text = "\n".join(jev_lines[-3:])
+        right_text = "\n".join(jev_lines[-10:])
         if done:
             right_title = "[bold green]flashLedger ⚡ (TypeSafe Jev) [FINISHED][/]"
             jev_tps = count / max(jev_time, 0.001)
@@ -179,8 +164,10 @@ async def run_split_screen_demo(
                 f"[dim]Elapsed: {jev_time:.2f}s | Latency: ~2.8ms / txn | Cost: <$0.01[/]\n\n"
                 f"{right_text}"
             )
-        layout["right"].update(
-            Panel(jev_status, title=right_title, border_style="green", box=box.ROUNDED)
+
+        grid.add_row(
+            Panel(left_status, title=left_title, border_style="red", box=box.ROUNDED),
+            Panel(jev_status, title=right_title, border_style="green", box=box.ROUNDED),
         )
 
         # Tax auditor data panel: visible throughout the entire demo!
@@ -190,16 +177,14 @@ async def run_split_screen_demo(
             else "[dim italic]Auditing transactions in parallel for IRS CapEx limits ($2,500 Safe Harbor) and tax risk...[/]"
         )
         tax_title = f"[bold yellow]🔍 Autonomous Tax Auditor & Compliance Flags [{capex_count} CapEx • {risk_count} Risks • 100% Tax Mapped][/]"
-        layout["tax"].update(
-            Panel(anom_text, title=tax_title, border_style="yellow", box=box.ROUNDED)
-        )
+        tax_panel = Panel(anom_text, title=tax_title, border_style="yellow", box=box.ROUNDED)
 
         # Economics Scorecard panel: visible throughout and live updating!
         active_jev_time = jev_time if done else max(jev_time, 0.001)
         active_jev_count = count if done else max(jev_c, 1)
-        layout["scorecard"].update(
-            render_scorecard(active_jev_count, active_jev_time, gpt_c, gpt_time, gpt_done=False)
-        )
+        scorecard = render_scorecard(active_jev_count, active_jev_time, gpt_c, gpt_time, gpt_done=False)
+
+        return Group(header, grid, tax_panel, scorecard)
 
     if not interactive:
         # Fast non-interactive mode for tests / scripting
@@ -223,8 +208,7 @@ async def run_split_screen_demo(
     jev_finish_time = 0.0
 
     try:
-        with Live(layout, console=con, screen=False, refresh_per_second=20) as live:
-            update_views(0, 0.0, 0, 0.0)
+        with Live(build_view(0, 0.0, 0, 0.0), console=con, screen=False, refresh_per_second=20) as live:
             await asyncio.sleep(0.3)
 
             chunk_idx = 0
@@ -263,31 +247,32 @@ async def run_split_screen_demo(
                             f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] {t.clean_description[:22]} flagged non-deductible"
                         )
 
-                # Update slow GPT-4o progress on the left (~1 txn every 0.6 seconds)
-                if now - last_gpt_tick >= 0.55:
-                    last_gpt_tick = now
-                    if gpt_completed < 50:
-                        gpt_completed += 1
-                        gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
-
-                update_views(gpt_completed, elapsed, jev_completed, elapsed)
-                if delay_per_chunk > 0:
-                    await asyncio.sleep(delay_per_chunk)
-
-            # Jev finishes all 1,000 transactions!
-            jev_finish_time = time.perf_counter() - start_total
-            update_views(gpt_completed, jev_finish_time, count, jev_finish_time, done=True)
-
-            # Keep GPT-4o grinding on the left so viewers can see the staggering speed contrast!
-            while gpt_completed < 50:
-                now = time.perf_counter()
-                elapsed = now - start_total
-                if now - last_gpt_tick >= 0.55:
-                    last_gpt_tick = now
+            gpt_target_limit = min(50, count)
+            # Update slow GPT-4o progress on the left (~1 txn every 0.6 seconds)
+            if now - last_gpt_tick >= 0.55:
+                last_gpt_tick = now
+                if gpt_completed < gpt_target_limit:
                     gpt_completed += 1
                     gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
-                    update_views(gpt_completed, elapsed, count, jev_finish_time, done=True)
-                await asyncio.sleep(0.04)
+
+            live.update(build_view(gpt_completed, elapsed, jev_completed, elapsed))
+            if delay_per_chunk > 0:
+                await asyncio.sleep(delay_per_chunk)
+
+        # Jev finishes all transactions!
+        jev_finish_time = time.perf_counter() - start_total
+        live.update(build_view(gpt_completed, jev_finish_time, count, jev_finish_time, done=True))
+
+        # Keep GPT-4o grinding on the left so viewers can see the staggering speed contrast!
+        while gpt_completed < gpt_target_limit:
+            now = time.perf_counter()
+            elapsed = now - start_total
+            if now - last_gpt_tick >= 0.55:
+                last_gpt_tick = now
+                gpt_completed += 1
+                gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
+                live.update(build_view(gpt_completed, elapsed, count, jev_finish_time, done=True))
+            await asyncio.sleep(0.04)
 
     except (KeyboardInterrupt, asyncio.CancelledError):
         pass
@@ -299,5 +284,5 @@ async def run_split_screen_demo(
     con.print(
         f"[bold green]✓ Demo Complete:[/] flashLedger audited {count:,} transactions in "
         f"[bold]{jev_finish_time:.2f}s[/] with 100% typed schema guarantees "
-        f"[dim](Traditional LLM reached {gpt_completed}/50 txns in {final_now:.1f}s)[/]."
+        f"[dim](Traditional LLM reached {gpt_completed}/{gpt_target_limit} txns in {final_now:.1f}s)[/]."
     )
