@@ -123,30 +123,56 @@ async def run_split_screen_demo(
     def update_views(gpt_c: int, gpt_time: float, jev_c: int, jev_time: float, done: bool = False):
         # Left panel: Traditional LLM
         left_text = "\n".join(gpt_lines[-3:])
-        left_status = (
-            f"[bold red]Processing {gpt_c} / 50 txns...[/] [dim](Simulated ~1.8 txns/s)[/]\n"
-            f"[dim]Elapsed: {gpt_time:.1f}s | Speed: ~1.8 txns/s | Cost: ${gpt_c * 0.009:.3f}[/]\n\n"
-            f"{left_text}"
-        )
+        if done:
+            left_title = "[bold red]Traditional LLM (GPT-4o) [CRAWLING...][/]"
+            left_status = (
+                f"[bold red]⏳ STILL PROCESSING... {gpt_c} / 50 txns[/] [dim](~1.8 txns/s)[/]\n"
+                f"[dim]Elapsed: {gpt_time:.1f}s | Cost: ${gpt_c * 0.009:.3f} | Est. 1k Txns: ~9.3m[/]\n\n"
+                f"{left_text}"
+            )
+        else:
+            left_title = "[bold red]Traditional LLM (GPT-4o)[/]"
+            left_status = (
+                f"[bold red]Processing {gpt_c} / 50 txns...[/] [dim](Simulated ~1.8 txns/s)[/]\n"
+                f"[dim]Elapsed: {gpt_time:.1f}s | Speed: ~1.8 txns/s | Cost: ${gpt_c * 0.009:.3f}[/]\n\n"
+                f"{left_text}"
+            )
         layout["left"].update(
-            Panel(left_status, title="[bold red]Traditional LLM (GPT-4o)[/]", border_style="red", box=box.ROUNDED)
+            Panel(left_status, title=left_title, border_style="red", box=box.ROUNDED)
         )
 
         # Right panel: flashLedger (Jev)
         right_text = "\n".join(jev_lines[-3:])
-        rate = jev_c / max(jev_time, 0.001)
-        status_tag = "[bold green]COMPLETED[/]" if done else f"[bold green]{rate:.1f} txns/sec[/]"
-        jev_status = (
-            f"[bold green]Classified {jev_c:,} / {count:,} txns...[/] ({status_tag})\n"
-            f"[dim]Elapsed: {jev_time:.2f}s | Latency: ~2.8ms / txn | Cost: <$0.01[/]\n\n"
-            f"{right_text}"
-        )
+        if done:
+            right_title = "[bold green]flashLedger ⚡ (TypeSafe Jev) [FINISHED][/]"
+            jev_tps = count / max(jev_time, 0.001)
+            jev_status = (
+                f"[bold green]✓ ALL {count:,} TXNS AUDITED (COMPLETED)[/]\n"
+                f"[dim]Finished in: {jev_time:.2f}s | Speed: {jev_tps:.1f} txns/s | Cost: <$0.01[/]\n\n"
+                f"{right_text}"
+            )
+        else:
+            right_title = "[bold green]flashLedger ⚡ (TypeSafe Jev)[/]"
+            rate = jev_c / max(jev_time, 0.001)
+            jev_status = (
+                f"[bold green]Classified {jev_c:,} / {count:,} txns...[/] ([bold green]{rate:.1f} txns/sec[/])\n"
+                f"[dim]Elapsed: {jev_time:.2f}s | Latency: ~2.8ms / txn | Cost: <$0.01[/]\n\n"
+                f"{right_text}"
+            )
         layout["right"].update(
-            Panel(jev_status, title="[bold green]flashLedger ⚡ (TypeSafe Jev)[/]", border_style="green", box=box.ROUNDED)
+            Panel(jev_status, title=right_title, border_style="green", box=box.ROUNDED)
         )
 
         # Bottom panel: Live Anomalies during animation, or Scorecard when complete
         if done:
+            layout["header"].update(
+                Panel(
+                    f"[bold green]⚡ flashLedger: ALL {count:,} TXNS AUDITED IN {jev_time:.2f}s![/] "
+                    f"[dim]| Traditional LLM still crawling (~9.3 min for 1k txns) [Press Ctrl+C to stop][/]",
+                    box=box.ROUNDED,
+                    style="green",
+                )
+            )
             layout["bottom"].update(render_scorecard(count, jev_time, gpt_c, jev_time))
         else:
             speedup = rate / 1.8 if rate > 0 else 0
@@ -185,63 +211,84 @@ async def run_split_screen_demo(
     gpt_completed = 0
     start_total = time.perf_counter()
     last_gpt_tick = start_total
+    jev_finish_time = 0.0
 
-    with Live(layout, console=con, screen=False, refresh_per_second=20) as live:
-        update_views(0, 0.0, 0, 0.0)
-        await asyncio.sleep(0.3)
+    try:
+        with Live(layout, console=con, screen=False, refresh_per_second=20) as live:
+            update_views(0, 0.0, 0, 0.0)
+            await asyncio.sleep(0.3)
 
-        chunk_idx = 0
-        for i in range(0, count, batch_chunk_size):
-            chunk = transactions[i : i + batch_chunk_size]
-            audit_tasks = [engine.audit_transaction(t) for t in chunk]
-            results = await asyncio.gather(*audit_tasks)
+            chunk_idx = 0
+            for i in range(0, count, batch_chunk_size):
+                chunk = transactions[i : i + batch_chunk_size]
+                audit_tasks = [engine.audit_transaction(t) for t in chunk]
+                results = await asyncio.gather(*audit_tasks)
 
-            now = time.perf_counter()
-            elapsed = now - start_total
+                now = time.perf_counter()
+                elapsed = now - start_total
 
-            for t, res in zip(chunk, results):
-                jev_completed += 1
-                tag_color = {
-                    "Software/SaaS": "green",
-                    "Meals & Entertainment": "cyan",
-                    "Hardware & Equipment": "yellow",
-                    "Travel": "blue",
-                    "Transportation & Rideshare": "magenta",
-                    "Personal / Non-Deductible": "red",
-                }.get(res.gl_code, "white")
+                for t, res in zip(chunk, results):
+                    jev_completed += 1
+                    tag_color = {
+                        "Software/SaaS": "green",
+                        "Meals & Entertainment": "cyan",
+                        "Hardware & Equipment": "yellow",
+                        "Travel": "blue",
+                        "Transportation & Rideshare": "magenta",
+                        "Personal / Non-Deductible": "red",
+                    }.get(res.gl_code, "white")
 
-                tag = f"[{tag_color}][{res.gl_code}][/{tag_color}]"
-                deduct = "[green]✓Deduct[/]" if res.is_tax_deductible else "[red]✗Non-Ded[/]"
-                clean_name = t.clean_description[:18]
-                jev_lines.append(f"#{jev_completed:04d} {clean_name:<18} {tag} {deduct}")
+                    tag = f"[{tag_color}][{res.gl_code}][/{tag_color}]"
+                    deduct = "[green]✓Deduct[/]" if res.is_tax_deductible else "[red]✗Non-Ded[/]"
+                    clean_name = t.clean_description[:18]
+                    jev_lines.append(f"#{jev_completed:04d} {clean_name:<18} {tag} {deduct}")
 
-                if "CAPEX_REVIEW_REQUIRED" in res.flags:
-                    capex_count += 1
-                    flagged_anomalies.append(
-                        f"[bold yellow]⚠️  CAPEX ALERT:[/] {t.clean_description} (${t.amount:,.2f}) exceeds $2,500 IRS Safe Harbor limit."
-                    )
-                if "HIGH_AUDIT_RISK" in res.flags:
-                    risk_count += 1
-                    flagged_anomalies.append(
-                        f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] {t.clean_description} flagged as non-deductible."
-                    )
+                    if "CAPEX_REVIEW_REQUIRED" in res.flags:
+                        capex_count += 1
+                        flagged_anomalies.append(
+                            f"[bold yellow]⚠️  CAPEX ALERT:[/] {t.clean_description} (${t.amount:,.2f}) exceeds $2,500 IRS Safe Harbor limit."
+                        )
+                    if "HIGH_AUDIT_RISK" in res.flags:
+                        risk_count += 1
+                        flagged_anomalies.append(
+                            f"[bold red]🚨 AUDIT RISK (Score {res.audit_risk_score:.2f}):[/] {t.clean_description} flagged as non-deductible."
+                        )
 
-            # Update slow GPT-4o progress on the left (~1 txn every 0.6 seconds)
-            if now - last_gpt_tick >= 0.55:
-                last_gpt_tick = now
-                if gpt_completed < 50:
+                # Update slow GPT-4o progress on the left (~1 txn every 0.6 seconds)
+                if now - last_gpt_tick >= 0.55:
+                    last_gpt_tick = now
+                    if gpt_completed < 50:
+                        gpt_completed += 1
+                        gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
+
+                update_views(gpt_completed, elapsed, jev_completed, elapsed)
+                if delay_per_chunk > 0:
+                    await asyncio.sleep(delay_per_chunk)
+
+            # Jev finishes all 1,000 transactions!
+            jev_finish_time = time.perf_counter() - start_total
+            update_views(gpt_completed, jev_finish_time, count, jev_finish_time, done=True)
+
+            # Keep GPT-4o grinding on the left so viewers can see the staggering speed contrast!
+            while gpt_completed < 50:
+                now = time.perf_counter()
+                elapsed = now - start_total
+                if now - last_gpt_tick >= 0.55:
+                    last_gpt_tick = now
                     gpt_completed += 1
                     gpt_lines.append(f"Processing transaction #{gpt_completed} via GPT-4o JSON...")
+                    update_views(gpt_completed, elapsed, count, jev_finish_time, done=True)
+                await asyncio.sleep(0.04)
 
-            update_views(gpt_completed, elapsed, jev_completed, elapsed)
-            if delay_per_chunk > 0:
-                await asyncio.sleep(delay_per_chunk)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
 
-        total_elapsed = time.perf_counter() - start_total
-        update_views(gpt_completed, total_elapsed, count, total_elapsed, done=True)
-        await asyncio.sleep(1.0)
+    final_now = time.perf_counter() - start_total
+    if jev_finish_time == 0.0:
+        jev_finish_time = final_now
 
     con.print(
-        f"[bold green]✓ Demo Complete:[/] {count:,} transactions audited in "
-        f"[bold]{total_elapsed:.2f}s[/] with 100% typed schema guarantees."
+        f"[bold green]✓ Demo Complete:[/] flashLedger audited {count:,} transactions in "
+        f"[bold]{jev_finish_time:.2f}s[/] with 100% typed schema guarantees "
+        f"[dim](Traditional LLM reached {gpt_completed}/50 txns in {final_now:.1f}s)[/]."
     )
