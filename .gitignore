@@ -67,4 +67,5 @@ data/uk_gov_spending_2024.csv
 *_audited.*
 data/*.parquet
 data/*_audited.*
+data/*.txt
 .github/hooks/
